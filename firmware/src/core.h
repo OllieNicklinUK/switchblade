@@ -198,6 +198,9 @@ typedef struct {                 /* an engine (engines.c ENGINES[]; the eng_*.c 
     /* optional (2026-10-21, NANO's two models): per track, whether the engine runs its own envelope (else .ownenv) and its voice cap (else .poly) */
     int (*ownenv_of)(const struct track *t);
     uint8_t (*poly_of)(const struct track *t);
+    /* optional (V2, GW-Z after Quantum GammaWave): once a block, before the part's voices render (voice.c track_render):
+     * per-part values the voices share (an organ's bar gains and rotors, a spectrum's partial gains). NULL: none */
+    void (*block)(struct track *t);
 } engine_t;
 
 /* ------------------------------------------------- tracks, the song --- */

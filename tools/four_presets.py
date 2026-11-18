@@ -41,7 +41,7 @@ RANGES = {                                                       # edit[0..7] mi
     "DRIFT": [PCT] * 8,
     "JPZ": [PCT, PCT, (-64, 63), (-24, 24), PCT, PCT, PCT, PCT],      # eng_stub.c ENG_JPZ (DTN MIX BAL OSC2 CUT RES KTR WID)
     "CZZ": [(0, 7), (0, 7), (0, 3), PCT, PCT, PCT, (0, 2), PCT],   # eng_cz.c ENG_CZZ (WAV1 WAV2 LINE DTN CUT KEYF MOD DCWE)
-    "GWZ": [(0, 15), (-64, 63), (-64, 63), (-64, 63)] + [PCT] * 4,   # ENG_GWZ (REG SUB BODY TOP CUT RES DRV ROTR)
+    "GWZ": [PCT] * 8,                                              # eng_gwz.c ENG_GWZ: every slot 0..127 on its three models
     "MICRO": [(0, 31), PCT, (-64, 63)] + [PCT] * 5,                 # ENG_MICRO (WT POS EPOS OSC2 CUT RES GRIT KTR)
 }
 WAVE_PX = dict(ftype=(0, 6), voice=(0, 3), detune=(0, 128), spread=PCT, glide=PCT, ldflt=(-64, 63), lsync=(0, 10))
@@ -59,6 +59,7 @@ def cz_px(p):
     return list(d["r"]) + list(d["l"]) + [8 if sus is None else sus, d["end"], p.get("oct2", 0) + 2]
 
 
+GW_MODELS = {"ORGAN": 0, "VOX": 1, "ADD": 2}                      # GW-Z (eng_gwz.c gw_track_loaded): model, then ORGAN's click
 DRIFT_CHOR = (0, 3)                                              # DRIFT's chor: the Juno chorus, 0 OFF, 1 I, 2 II, 3 I+II (absent = 0)
 
 
@@ -196,6 +197,10 @@ def validate(m, pr, rng, errs):
             check_range(errs, who, f"fx[{i}]", v, 0, 126)
         if m == "DRIFT":
             check_range(errs, who, "chor", p.get("chor", 0), *DRIFT_CHOR)
+        if m == "GWZ":
+            if p.get("model", "ORGAN") not in GW_MODELS:
+                errs.append(f"{who}: model is one of {', '.join(GW_MODELS)}")
+            check_range(errs, who, "click", p.get("click", 0), 0, 127)
         if m == "CZZ":
             d = p.get("dcw", CZ_DCW_DEF)
             if len(d.get("r", ())) != 8 or len(d.get("l", ())) != 8:
@@ -277,6 +282,9 @@ def main():
     H += [f"static const uint8_t NANO_PX[][{len(NANO_KEYS)}] = {{   /* NANO (eng_acid.c acid_track_loaded; eng_sub.c NPX_*): model (0 the 303, 1 SUB), then SUB's",
           "    * TYPE, mono, glide, filter ADSR, key track, osc 1 level, osc 2 wave, semitones, PWM, velocity, LFO rate / pitch / cutoff, volume */"]
     H += [f'    {{{", ".join(str(p.get(k, 0)) for k in NANO_KEYS)}}},   /* {p["name"]} */' for p in sets["ACID"]]
+    H.append("};")
+    H += ["static const uint8_t GW_PX[][2] = {   /* GW-Z (eng_gwz.c gw_track_loaded): model (0 ORGAN 1 VOX 2 ADD), ORGAN's click */"]
+    H += [f'    {{{GW_MODELS[p.get("model", "ORGAN")]}, {p.get("click", 0)}}},   /* {p["name"]} */' for p in sets["GWZ"]]
     H.append("};")
     H += ["static const uint8_t CZ_PX[][19] = {   /* CZ-Z (eng_cz.c cz_track_loaded): the 8-step DCW envelope: 8 rates, 8 levels,",
           "    * SUS step (8 none), END step; then line 2's octave + 2 */"]

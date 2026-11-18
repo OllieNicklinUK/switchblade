@@ -38,19 +38,6 @@ static void stub_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
 
 /* (CZ-Z: its own voice since Phase 1, eng_cz.c; JP-Z since Phase 3, eng_jpz.c) */
 
-static const engine_t ENG_GWZ = {                        /* ORGAN / VOX / ADD, after Quantum GammaWave (the plan §6); ORGAN's slots */
-    .name = "GW-Z", .page_title = {"VOICE", "TONE"},
-    .edit = {
-        {"REG", F_INT, 0, 15, 0, 0, 0},             {"SUB", F_BIPCT, -64, 63, 0, 0, 0},
-        {"BODY", F_BIPCT, -64, 63, 0, 0, 0},        {"TOP", F_BIPCT, -64, 63, 0, 0, 0},
-        {"CUT", F_CUTOFF, 0, 127, 110, 0, 0},       {"RES", F_PCT, 0, 127, 0, 0, 0},
-        {"DRV", F_PCT, 0, 127, 0, 0, 0},            {"ROTR", F_PCT, 0, 127, 0, 0, 0},
-    },
-    .presets = GWZ_PRESETS, .npresets = NELEM(GWZ_PRESETS),   /* presets/four/gwz.py */
-    .knob = {P_E4, P_E5, P_ED_FLT, P_E7},
-    .note_on = stub_note_on, .render = stub_render,
-};
-
 static const engine_t ENG_MICRO = {                      /* Waldorf Microwave I (the plan §7) */
     .name = "MICRO", .page_title = {"WAVE", "FLT"},
     .edit = {

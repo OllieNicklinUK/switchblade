@@ -722,6 +722,8 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
     track_lfo_tick(t);
     esync_coef(t);                                      /* this block's envelope steps for env_tick (ENV SYNC) */
     own = trk_ownenv(t);
+    if (e->block)                                       /* V2: the engine's once-a-block work, before its voices (GW-Z) */
+        e->block(t);
     for (i = 0; i < NVOICE; i++) {
         voice_t *v = &t->v[i];
         vmod_t m;

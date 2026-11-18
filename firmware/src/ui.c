@@ -1167,6 +1167,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     drift_track_loaded(t);                            /* DRIFT: its chorus */
     acid_track_loaded(t);                             /* NANO: its model (303 / SUB) and filter TYPE */
     cz_track_loaded(t);                               /* CZ-Z: its 8-step DCW envelope, line 2's octave */
+    gw_track_loaded(t);                               /* GW-Z: its model (ORGAN VOX ADD), ORGAN's click */
     load_end(t);
 }
 

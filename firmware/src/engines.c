@@ -12,7 +12,7 @@ _Static_assert(NELEM(WAVE_PX) == NPRESET, "WAVE: 50 presets (WAVE_PX)");
 _Static_assert(NELEM(DRIFT_PX) == NPRESET && NELEM(NANO_PX) == NPRESET, "DRIFT_PX, NANO_PX: 50 presets");
 _Static_assert(NELEM(JPZ_PRESETS) == NPRESET && NELEM(JPZ_CAT) == NPRESET, "JPZ: 50 presets");
 _Static_assert(NELEM(CZZ_PRESETS) == NPRESET && NELEM(CZZ_CAT) == NPRESET && NELEM(CZ_PX) == NPRESET, "CZZ: 50 presets");
-_Static_assert(NELEM(GWZ_PRESETS) == NPRESET && NELEM(GWZ_CAT) == NPRESET, "GWZ: 50 presets");
+_Static_assert(NELEM(GWZ_PRESETS) == NPRESET && NELEM(GWZ_CAT) == NPRESET && NELEM(GW_PX) == NPRESET, "GWZ: 50 presets");
 _Static_assert(NELEM(MICRO_PRESETS) == NPRESET && NELEM(MICRO_CAT) == NPRESET, "MICRO: 50 presets");
 
 /* The parts' engine memory (1.5): a part plays one engine at a time, so the engines with per-part state
@@ -33,9 +33,11 @@ static inline void *eng_mem_of(uint32_t p);
 #include "eng_wave.c"           /* WAVE: the VOID WAVE plugin's voice (wavetables: tools/gen_void_tables.py) */
 #include "eng_cz.c"             /* CZ-Z (V2 Phase 1): the uPD933 voice, after MAME's upd933.cpp (Devin Acker, BSD-3-Clause) */
 #include "eng_jpz.c"            /* JP-Z (V2 Phase 3): the JP-8000's Super Saw, after the ESP2 microcode analysis */
-#include "eng_stub.c"           /* V2: GW-Z, MICRO on a placeholder voice until their phases */
+#include "eng_gwz.c"            /* GW-Z (V2 Phase 2): ORGAN / VOX / ADD, Quantum GammaWave's WHEEL, VOICE and ADDTV */
+#include "eng_stub.c"           /* V2: MICRO on a placeholder voice until Phase 4 */
 ENG_MEM_FITS("DRIFT", DRIFT_MEM);
 ENG_MEM_FITS("JPZ", JPZ_MEM);
+ENG_MEM_FITS("GWZ", GW_MEM);
 ENG_MEM_FITS("ACID", ACID_MEM);    /* (against the region, not against WAVE: ACID owes the pool nothing but its own size; the test pins that the pool did not grow) */
 
 static union {
