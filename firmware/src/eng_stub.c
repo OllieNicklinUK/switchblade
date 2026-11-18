@@ -36,9 +36,6 @@ static void stub_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     v->s[0] = lp;
 }
 
-static const char *const N_CZ_WAVE[] = {"SAW", "SQR", "PULS", "DSIN", "SAWP", "RES1", "RES2", "RES3"};
-static const char *const N_CZ_LINE[] = {"1", "2", "1+1'", "1+2'"};
-
 static const engine_t ENG_JPZ = {                        /* Roland JP-8000 Super Saw (2026-11-17-supr-jp8000.md §4.2) */
     .name = "JP-Z", .page_title = {"OSC", "FLT"},
     .edit = {
@@ -52,18 +49,7 @@ static const engine_t ENG_JPZ = {                        /* Roland JP-8000 Super
     .note_on = stub_note_on, .render = stub_render,
 };
 
-static const engine_t ENG_CZZ = {                        /* Casio CZ phase distortion (the plan §5) */
-    .name = "CZ-Z", .page_title = {"OSC", "DCW"},
-    .edit = {
-        {"WAV1", F_ENUM, 0, 7, 0, N_CZ_WAVE, 0},     {"WAV2", F_ENUM, 0, 7, 0, N_CZ_WAVE, 0},
-        {"LINE", F_ENUM, 0, 3, 0, N_CZ_LINE, 0},     {"DTN", F_PCT, 0, 127, 0, 0, 0},
-        {"CUT", F_CUTOFF, 0, 127, 90, 0, 0},        {"RES", F_PCT, 0, 127, 30, 0, 0},
-        {"RING", F_PCT, 0, 127, 0, 0, 0},           {"DCWE", F_PCT, 0, 127, 64, 0, 0},
-    },
-    .presets = CZZ_PRESETS, .npresets = NELEM(CZZ_PRESETS),   /* presets/four/czz.py */
-    .knob = {P_E4, P_E5, P_ED_FLT, P_E7},
-    .note_on = stub_note_on, .render = stub_render,
-};
+/* (CZ-Z: its own voice since Phase 1, eng_cz.c) */
 
 static const engine_t ENG_GWZ = {                        /* ORGAN / VOX / ADD, after Quantum GammaWave (the plan §6); ORGAN's slots */
     .name = "GW-Z", .page_title = {"VOICE", "TONE"},

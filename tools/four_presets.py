@@ -40,7 +40,7 @@ RANGES = {                                                       # edit[0..7] mi
     "ACID": [(0, 1), (-64, 63)] + [PCT] * 6,
     "DRIFT": [PCT] * 8,
     "JPZ": [PCT, PCT, (-64, 63), (-24, 24), PCT, PCT, PCT, PCT],      # eng_stub.c ENG_JPZ (DTN MIX BAL OSC2 CUT RES KTR WID)
-    "CZZ": [(0, 7), (0, 7), (0, 3)] + [PCT] * 5,                    # ENG_CZZ (WAV1 WAV2 LINE DTN CUT RES RING DCWE)
+    "CZZ": [(0, 7), (0, 7), (0, 3), PCT, PCT, PCT, (0, 2), PCT],   # eng_cz.c ENG_CZZ (WAV1 WAV2 LINE DTN CUT KEYF MOD DCWE)
     "GWZ": [(0, 15), (-64, 63), (-64, 63), (-64, 63)] + [PCT] * 4,   # ENG_GWZ (REG SUB BODY TOP CUT RES DRV ROTR)
     "MICRO": [(0, 31), PCT, (-64, 63)] + [PCT] * 5,                 # ENG_MICRO (WT POS EPOS OSC2 CUT RES GRIT KTR)
 }
@@ -48,6 +48,17 @@ WAVE_PX = dict(ftype=(0, 6), voice=(0, 3), detune=(0, 128), spread=PCT, glide=PC
 NANO_MODEL = (0, 1)                                              # NANO's model: 0 the 303, 1 SUB (eng_sub.c); the ACID category is the 303's
 NANO_FTYPE = (0, 3)                                              # SUB's filter TYPE (P_FTYPE): 0 LP24 1 BP 2 HP 3 LP12
 NANO_KEYS = ["model", "ftype", "mono1", "glide", "fa", "fd", "fs", "fr", "ktrk", "o1", "w2", "semi", "pwm", "vel", "lrate", "lpit", "lcut", "vol"]   # eng_sub.c NPX_*
+# CZ-Z (eng_cz.c cz_track_loaded, V2 Phase 1): dcw = the 8-step DCW envelope, dict(r=[8 rates 0..99], l=[8 levels 0..99],
+# sus=step 0..7 or None, end=step 0..7), absent = CZ_DCW_DEF; oct2 = line 2's octave -2..2 (absent 0)
+CZ_DCW_DEF = dict(r=[92, 55, 45, 0, 0, 0, 0, 0], l=[99, 60, 0, 0, 0, 0, 0, 0], sus=1, end=2)
+
+
+def cz_px(p):
+    d = p.get("dcw", CZ_DCW_DEF)
+    sus = d.get("sus")
+    return list(d["r"]) + list(d["l"]) + [8 if sus is None else sus, d["end"], p.get("oct2", 0) + 2]
+
+
 DRIFT_CHOR = (0, 3)                                              # DRIFT's chor: the Juno chorus, 0 OFF, 1 I, 2 II, 3 I+II (absent = 0)
 
 
@@ -185,6 +196,18 @@ def validate(m, pr, rng, errs):
             check_range(errs, who, f"fx[{i}]", v, 0, 126)
         if m == "DRIFT":
             check_range(errs, who, "chor", p.get("chor", 0), *DRIFT_CHOR)
+        if m == "CZZ":
+            d = p.get("dcw", CZ_DCW_DEF)
+            if len(d.get("r", ())) != 8 or len(d.get("l", ())) != 8:
+                errs.append(f"{who}: dcw needs 8 rates and 8 levels")
+            for i, v in enumerate(list(d.get("r", ()))[:8] + list(d.get("l", ()))[:8]):
+                check_range(errs, who, f"dcw[{i}]", v, 0, 99)
+            check_range(errs, who, "dcw end", d.get("end"), 0, 7)
+            if d.get("sus") is not None:
+                check_range(errs, who, "dcw sus", d.get("sus"), 0, 7)
+                if d["sus"] > d.get("end", 0):
+                    errs.append(f"{who}: dcw sus after end")
+            check_range(errs, who, "oct2", p.get("oct2", 0), -2, 2)
         if m == "ACID":
             check_range(errs, who, "model", p.get("model", 0), *NANO_MODEL)
             check_range(errs, who, "ftype", p.get("ftype", 0), *NANO_FTYPE)
@@ -254,6 +277,10 @@ def main():
     H += [f"static const uint8_t NANO_PX[][{len(NANO_KEYS)}] = {{   /* NANO (eng_acid.c acid_track_loaded; eng_sub.c NPX_*): model (0 the 303, 1 SUB), then SUB's",
           "    * TYPE, mono, glide, filter ADSR, key track, osc 1 level, osc 2 wave, semitones, PWM, velocity, LFO rate / pitch / cutoff, volume */"]
     H += [f'    {{{", ".join(str(p.get(k, 0)) for k in NANO_KEYS)}}},   /* {p["name"]} */' for p in sets["ACID"]]
+    H.append("};")
+    H += ["static const uint8_t CZ_PX[][19] = {   /* CZ-Z (eng_cz.c cz_track_loaded): the 8-step DCW envelope: 8 rates, 8 levels,",
+          "    * SUS step (8 none), END step; then line 2's octave + 2 */"]
+    H += [f'    {{{", ".join(str(v) for v in cz_px(p))}}},   /* {p["name"]} */' for p in sets["CZZ"]]
     H.append("};")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(H) + "\n")

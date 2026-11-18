@@ -34,3 +34,5 @@ track_insert 3
 ins_drive 277
 ins_swept 230
 track_dist 56
+cz_render 114
+cz_wave 18

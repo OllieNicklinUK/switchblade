@@ -1166,6 +1166,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     void_track_loaded(t);                             /* WAVE: its filter TYPE and LFO routing */
     drift_track_loaded(t);                            /* DRIFT: its chorus */
     acid_track_loaded(t);                             /* NANO: its model (303 / SUB) and filter TYPE */
+    cz_track_loaded(t);                               /* CZ-Z: its 8-step DCW envelope, line 2's octave */
     load_end(t);
 }
 

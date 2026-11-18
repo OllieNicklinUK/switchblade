@@ -103,7 +103,8 @@ def generate():
             [tools / "gen_ui_palettes.py", GEN / "ui_palettes.h"],
             [tools / "gen_logo.py", GEN / "ui_logo.h"],
             [tools / "gen_tables.py", GEN / "felucca_tables.h"],
-            [tools / "gen_void_tables.py", GEN / "void_tables.h"]]
+            [tools / "gen_void_tables.py", GEN / "void_tables.h"],
+            [tools / "gen_cz_tables.py", GEN / "cz_tables.h"]]
     procs = [subprocess.Popen([sys.executable, *map(str, c)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               text=True) for c in cmds]
     failed = []

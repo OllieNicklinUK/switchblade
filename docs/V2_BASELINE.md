@@ -83,3 +83,11 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - Today: 400 presets, 0 silent, 0 hot, 0 repeated names, 0 out of range; 264 exact duplicates, all Phase 0 placeholders (4 x 18 SLOT copies, 4 x 48 INIT twins).
 - Levels (loudest ~93 ms, dBFS; `--levels`, `tools/gen_preset_levels.py`): target -14.1 (the median of the 128 voiced presets). Spread inside a machine: OB-Z 16.4 dB, WAVE 14.0, NANO 25.2, JUNO 12.6; 54 voiced presets are more than 3 dB off. The corrections go into the presets in Phase 5; the tool writes no firmware (LEVEL is the part's own fader on Switch Blade, kept across a preset load).
 - Found on the way: measuring presets one after another in one process let the last preset's state (buses, engine memory) change the next one's level by up to 14 dB. The audit forks per preset; anything that measures presets must start each from power-on state.
+
+## Phase 1: CZ-Z (2026-11-18)
+
+- The voice: `firmware/src/cz_core.h` (the uPD933 after MAME's `upd933.cpp`, Devin Acker, BSD-3-Clause) and `firmware/src/eng_cz.c` (two lines, LINE 1 / 2 / 1+1' / 1+2', RING, NOISE, the 8-step DCW envelope, a DC blocker). Tables `build/gen/cz_tables.h` (cosine 4 KB, envelope rates).
+- `tests/cz_ref.cpp`: MAME's file built unmodified on the host; 17,340,000 samples, 0 different; the cosine 0 of 2048 different. `tests/cz_test.c`: the parts that are ours (modes, DCW controls, the envelope's SUS and release, RING / NOISE, the preset's slots, every preset sounds with no DC).
+- Image 433,648 B (+7.0 KB); RAM unchanged (45,316 B).
+- Host CPU: CZ-Z presets 1,261 .. 2,027 instructions / sample for 8 voices (idle 474), about 190 a voice in the two-line modes; `worst8` unchanged at 3,863 (JUNO is still dearer per voice). Static target count: `cz_render` 114, `cz_wave` 18 (out of line; it holds one divide a line a sample: the device figure to watch).
+- Goldens: the 50 CZ-Z lines replaced (the stub's are gone); the 363 others unchanged. Preset audit: CZ-Z level median -16.9 dBFS (target -14.1), spread 16.9 dB.
