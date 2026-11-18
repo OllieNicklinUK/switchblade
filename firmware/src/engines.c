@@ -32,8 +32,10 @@ static inline void *eng_mem_of(uint32_t p);
 #include "eng_drift.c"          /* DRIFT: the Juno voice (dsp_va.c, after the Ultramaster KR-106) */
 #include "eng_wave.c"           /* WAVE: the VOID WAVE plugin's voice (wavetables: tools/gen_void_tables.py) */
 #include "eng_cz.c"             /* CZ-Z (V2 Phase 1): the uPD933 voice, after MAME's upd933.cpp (Devin Acker, BSD-3-Clause) */
-#include "eng_stub.c"           /* V2: JP-Z, GW-Z, MICRO on a placeholder voice until their phases */
+#include "eng_jpz.c"            /* JP-Z (V2 Phase 3): the JP-8000's Super Saw, after the ESP2 microcode analysis */
+#include "eng_stub.c"           /* V2: GW-Z, MICRO on a placeholder voice until their phases */
 ENG_MEM_FITS("DRIFT", DRIFT_MEM);
+ENG_MEM_FITS("JPZ", JPZ_MEM);
 ENG_MEM_FITS("ACID", ACID_MEM);    /* (against the region, not against WAVE: ACID owes the pool nothing but its own size; the test pins that the pool did not grow) */
 
 static union {

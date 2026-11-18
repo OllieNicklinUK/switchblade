@@ -100,6 +100,21 @@ int main(int argc, char **argv)
                         snprintf(got[n++], 64, "%u-%u-%u p%u w%u %016llx", UE[b], UE[a], UE[b], pi, wait,
                                  (unsigned long long)useq(s3, 3, pi, wait));
                 }
+    /* V2: the four new machines (JP-Z keeps its saws' phases and its chorus in the region; CZ-Z, and until Phases 2 and 4
+     * GW-Z and MICRO, none) to and from each of the four: X-Y, Y-X and X-Y-X at preset 0, both waits. Appended: the
+     * 168 above stay as they were (the part alongside still plays the four) */
+    {
+        static const uint32_t VE[] = {ENGI_JPZ, ENGI_CZZ, ENGI_GWZ, ENGI_MICRO};
+        for (w = 0; w < 2u; w++)
+            for (a = 0; a < NELEM(VE); a++)
+                for (b = 0; b < UNE; b++) {
+                    uint32_t wait = w ? 0u : 10u, s1[2] = {VE[a], UE[b]}, s2[2] = {UE[b], VE[a]}, s3[3] = {VE[a], UE[b], VE[a]};
+                    snprintf(got[n++], 64, "%u-%u p0 w%u %016llx", VE[a], UE[b], wait, (unsigned long long)useq(s1, 2, 0, wait));
+                    snprintf(got[n++], 64, "%u-%u p0 w%u %016llx", UE[b], VE[a], wait, (unsigned long long)useq(s2, 2, 0, wait));
+                    snprintf(got[n++], 64, "%u-%u-%u p0 w%u %016llx", VE[a], UE[b], VE[a], wait,
+                             (unsigned long long)useq(s3, 3, 0, wait));
+                }
+    }
     if (!gf) {
         for (i = 0; i < n; i++)
             printf("%s\n", got[i]);

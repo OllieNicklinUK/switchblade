@@ -91,3 +91,9 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - Image 433,648 B (+7.0 KB); RAM unchanged (45,316 B).
 - Host CPU: CZ-Z presets 1,261 .. 2,027 instructions / sample for 8 voices (idle 474), about 190 a voice in the two-line modes; `worst8` unchanged at 3,863 (JUNO is still dearer per voice). Static target count: `cz_render` 114, `cz_wave` 18 (out of line; it holds one divide a line a sample: the device figure to watch).
 - Goldens: the 50 CZ-Z lines replaced (the stub's are gone); the 363 others unchanged. Preset audit: CZ-Z level median -16.9 dBFS (target -14.1), spread 16.9 dB.
+
+## Phase 3: JP-Z (2026-11-18, before Phase 2 at the user's request)
+
+- `firmware/src/eng_jpz.c`: 7 free-running naive saws (the ESP2 detune law and knob curve, 25/128 centre + MIX/128 sides), OSC2 by BAL, a one-pole HPF at f0 (Q8, so no truncation DC), a 12/24 dB TPT SVF (P_FTYPE), KTR, WID = the Juno chorus as the part's stereo; engine memory 7 phases x 8 voices + a chorus, seeded per claim. Not checked against a JP-8000 (no OS files).
+- Image 435,380 B (+1.7 KB); RAM unchanged. Host CPU: JP-Z presets 2,117 .. 2,380 instructions / sample for 8 voices, ~240 a voice; `worst8` unchanged (3,861). Static: `jpz_render` 216, no divides.
+- Goldens: the 50 JP-Z lines replaced, the others unchanged. `union_test` 168 -> 264 sequences (the four new machines to and from the four originals; the 168 unchanged). Preset audit: JP-Z median -10.9 dBFS, spread 19.8 dB.

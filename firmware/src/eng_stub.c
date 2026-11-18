@@ -36,20 +36,7 @@ static void stub_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     v->s[0] = lp;
 }
 
-static const engine_t ENG_JPZ = {                        /* Roland JP-8000 Super Saw (2026-11-17-supr-jp8000.md §4.2) */
-    .name = "JP-Z", .page_title = {"OSC", "FLT"},
-    .edit = {
-        {"DTN", F_PCT, 0, 127, 64, 0, 0},           {"MIX", F_PCT, 0, 127, 64, 0, 0},
-        {"BAL", F_BIPCT, -64, 63, -64, 0, 0},       {"OSC2", F_SEMI, -24, 24, 0, 0, 0},
-        {"CUT", F_CUTOFF, 0, 127, 100, 0, 0},       {"RES", F_PCT, 0, 127, 20, 0, 0},
-        {"KTR", F_PCT, 0, 127, 64, 0, 0},           {"WID", F_PCT, 0, 127, 0, 0, 0},
-    },
-    .presets = JPZ_PRESETS, .npresets = NELEM(JPZ_PRESETS),   /* presets/four/jpz.py */
-    .knob = {P_E4, P_E5, P_ED_FLT, P_E0},
-    .note_on = stub_note_on, .render = stub_render,
-};
-
-/* (CZ-Z: its own voice since Phase 1, eng_cz.c) */
+/* (CZ-Z: its own voice since Phase 1, eng_cz.c; JP-Z since Phase 3, eng_jpz.c) */
 
 static const engine_t ENG_GWZ = {                        /* ORGAN / VOX / ADD, after Quantum GammaWave (the plan §6); ORGAN's slots */
     .name = "GW-Z", .page_title = {"VOICE", "TONE"},

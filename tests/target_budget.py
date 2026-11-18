@@ -22,6 +22,7 @@ FUNCS = ["obx_render", "obx_render_f", "obx_render_p4", "obx_render_x",   # OB-Z
                                                     # invisible to this count, so it guards the structure -- the loops and the divides -- only)
          "void_render", "void_block_slow",            # WAVE (eng_wave.c): the four specialised fast loops (LP24 / SVF x DRV), and the one
                                                     # out-of-line copy for a note's first 5 ms and a closing cutoff (Task 4.4)
+         "jpz_render",                              # JP-Z (eng_jpz.c, V2 Phase 3): 7 naive saws, OSC2, the HPF, two SVFs
          "cz_render", "cz_wave",                    # CZ-Z (eng_cz.c, V2 Phase 1): the two lines, and the uPD933 sample (cz_core.h: out of line, its divides)
          "slicer_track",
          "fm1_alnk0_irq", "fm1_timer5_irq",               # the audio ISR; TIMER5: the key / LED scan (hal/fm1_input.h)

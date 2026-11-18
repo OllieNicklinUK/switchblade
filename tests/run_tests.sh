@@ -388,10 +388,12 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "CZ-Z: the uPD933 core bit-exact against MAME's upd933 (every waveform, window, DCW sweep, level, the ring)" "$OUT/cz_ref"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/cz_test" tests/cz_test.c -lm
     run "CZ-Z: LINE modes, CUT / DCWE / KEYF, the 8-step DCW envelope, RING, NOISE, the preset's slots, every preset sounds" "$OUT/cz_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/jpz_test" tests/jpz_test.c -lm
+    run "JP-Z: the Super Saw's detune law and mix, free phases and their seeding, the filter, KTR, BAL, WID, UNISON, every preset sounds" "$OUT/jpz_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
     run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/union_test" tests/union_test.c -lm
-    run "engine memory (1.5): every switch between the four machines sounds as recorded (168 sequences)" \
+    run "engine memory (1.5): every switch between the four machines, and (V2) the new four to and from them, sounds as recorded (264 sequences)" \
         "$OUT/union_test" tests/union_golden.txt
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/descdump" tests/descdump.c -lm
     echo "== parameter and engine tables as JSON (for the editor mock test)"
