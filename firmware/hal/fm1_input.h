@@ -168,6 +168,8 @@ static volatile struct {
     uint32_t pressed, released;  /* button edges since the last fm1_input_edges() */
     uint32_t notes_pressed;      /* note-key press edges since the last fm1_input_note_edges() */
     uint8_t raw[FM1_NCOL];       /* last frame, packed rows, 1 = closed */
+    uint8_t raw_prev[FM1_NCOL];  /* (V2, after Quantum GammaWave) the raw byte fm1__keys debounced last: its fast path */
+    uint8_t pend[FM1_NCOL];      /* .. bit r: row r of that column has a debounce in flight (cnt != 0) */
     uint8_t cnt[FM1_NKEY];       /* frames in a row against the debounced state */
     uint32_t note_t0[27];        /* TIMER4 tick of the first scan that saw note key n closed */
     uint8_t enc_prev[FM1_NENC], enc_last[FM1_NENC];
@@ -316,9 +318,23 @@ static void fm1__key(uint32_t id, uint32_t closed)
 static void fm1__keys(uint32_t p)                  /* the keys of column p, just read */
 {
     uint32_t r, raw = fm1_in.raw[p];
-    for (r = 1; r < 5u; r++)
-        if (FM1_KEYMAP[r][p] >= 0)
-            fm1__key((uint32_t)FM1_KEYMAP[r][p], (raw >> r) & 1u);
+    uint8_t pend = 0;
+    /* (V2, after Quantum GammaWave) a column that reads exactly as it did last frame, with no key in it mid-debounce,
+     * has nothing for the four fm1__key calls to do: each would find closed == the debounced state and store a 0 over
+     * the 0 its cnt already holds. The debounced state changes only in fm1__key, so skipping them is exact. This is
+     * the 10 kHz tick's largest piece of C after the 595 shift. */
+    if (raw == fm1_in.raw_prev[p] && !fm1_in.pend[p])
+        return;
+    fm1_in.raw_prev[p] = (uint8_t)raw;
+    for (r = 1; r < 5u; r++) {
+        int8_t id = FM1_KEYMAP[r][p];
+        if (id >= 0) {
+            fm1__key((uint32_t)id, (raw >> r) & 1u);
+            if (fm1_in.cnt[id])                   /* this row's debounce is not decided yet */
+                pend = (uint8_t)(pend | (1u << r));
+        }
+    }
+    fm1_in.pend[p] = pend;
 }
 
 static void fm1__frame(void);
