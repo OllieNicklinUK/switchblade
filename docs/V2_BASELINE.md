@@ -76,3 +76,10 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - 413 goldens unchanged. The host never turns the load budget on (its ticks do not advance inside the render), so it cannot change a golden; `tests/audio_test.c load_budget` drives it with simulated times.
 - `cpu/mix/worst8` (host, Linux counter): **3,863 instructions / sample**. `regress.c` picks it from each machine's dearest measured line, per voice, within each machine's cap, every part sounding, 8 voices in all. Today: JUNO DRIFT KEYS x3 on two parts, NANO BASSLINE x1 on two. It moves as the four new machines get their real voices (Phases 1-4), and it is the mix to PERF on the device with 0.2-beta's worst DIST mix (`cpu/DIST/worst_mix_on`).
 - `fm1_alnk0_irq` static count 31,155 (budget 30,886, +0.9 %).
+
+## Phase 0.7: the preset audit and the level report (2026-11-18)
+
+- `tests/preset_audit_test.c` (in the suite): every factory preset loaded as PRESETS loads it, one C4 held for ~1 s, each preset in its own child process from power-on state. Fails on: E0..E7 outside the machine's (model's) range, an envelope stage or send past its range, a bad name (empty, unprintable, over 14), a name repeated in a machine, silence (RMS < 8). Reports: hot (2 % of the note at |x| >= 32000), exact duplicates.
+- Today: 400 presets, 0 silent, 0 hot, 0 repeated names, 0 out of range; 264 exact duplicates, all Phase 0 placeholders (4 x 18 SLOT copies, 4 x 48 INIT twins).
+- Levels (loudest ~93 ms, dBFS; `--levels`, `tools/gen_preset_levels.py`): target -14.1 (the median of the 128 voiced presets). Spread inside a machine: OB-Z 16.4 dB, WAVE 14.0, NANO 25.2, JUNO 12.6; 54 voiced presets are more than 3 dB off. The corrections go into the presets in Phase 5; the tool writes no firmware (LEVEL is the part's own fader on Switch Blade, kept across a preset load).
+- Found on the way: measuring presets one after another in one process let the last preset's state (buses, engine memory) change the next one's level by up to 14 dB. The audit forks per preset; anything that measures presets must start each from power-on state.

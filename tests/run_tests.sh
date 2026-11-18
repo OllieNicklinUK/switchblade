@@ -291,6 +291,8 @@ if [ -f build/gen/felucca_tables.h ]; then
     if python3 -c "import PIL" 2>/dev/null; then python3 tests/ui_render.py build/ui_new build/ui_slot; fi
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/audio_test" tests/audio_test.c -lm
     run "audio: overload protection, bounded fades and DMA diagnostics" "$OUT/audio_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/preset_audit_test" tests/preset_audit_test.c -lm
+    run "preset audit (V2): every factory preset loads in range, sounds, is named once; levels and duplicates reported" "$OUT/preset_audit_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/click_test" tests/click_test.c -lm
     run "metronome and count-in: beats sample for sample (internal and external clock), accent, level, MASTER, not in USB, count-in timing, notes onto step 1" "$OUT/click_test"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/persistence_test" tests/persistence_test.c -lm
