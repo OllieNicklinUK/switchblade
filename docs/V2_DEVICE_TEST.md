@@ -33,7 +33,7 @@ machine knob sweeps the wavetable, GRIT on page 2. For CPU (section 4), add mix 
 The command-line installer needs `python-rtmidi`, which is not on this PC, so use the web installer from a local copy:
 
 ```
-cd D:\Switchblade\FM1-Four\build\v2test-site
+cd D:\Switchblade\FM1-Four\build\v2test2-site
 py -3 -m http.server 8000
 ```
 
@@ -42,7 +42,7 @@ editor tab and any DAW using the FM-1's MIDI port first. Leave the server window
 
 ## 2. Saving (the most important check)
 
-- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test1**.
+- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test2**.
 - [ ] Your 0.2-beta projects and user presets are still there, and load and sound as before.
 - [ ] Change a MENU setting, save a **project** and a **user preset**, switch the FM-1 off and on: all three kept.
 - [ ] Optional: the USB serial console's `status` shows `flash 1` (saving allowed).
