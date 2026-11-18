@@ -220,6 +220,40 @@ int main(void)
         }
         check("every JP-Z preset sounds (dry, C3)", !quiet);
     }
+    /* headroom (device test 2: the mix ran 8x hot, the saws in phase clipped the SVF and wrapped voice_amp: crackle):
+     * the mix's worst case, all seven saws at their extreme together, under voice_amp's 2^16 at every MIX; and every
+     * preset on C2..C7, 1.5 s each, never leaves the SVF states on their +-150000 clamp at a block's end */
+    {
+        int32_t mx, worst = 0;
+        uint32_t pi, nt, hit = 0, blk;
+        for (mx = 0; mx <= 127; mx++) {
+            int32_t pk = (((32767 * (25 + 6 * mx)) >> 7) * jpz_norm(mx)) >> 12;
+            if (pk > worst) worst = pk;
+        }
+        printf("jpz:   the mix's worst-case peak %d (voice_amp takes < 65536)\n", worst);
+        check("headroom: the mix's worst case (seven saws in phase, any MIX) under voice_amp's 2^16", worst < 65536);
+        for (pi = 0; pi < ENGINES[ENGI_JPZ]->npresets; pi++)
+            for (nt = 36; nt <= 96; nt += 12) {
+                fresh();
+                host_preset(&trk[0], ENGI_JPZ, pi);
+                trk[0].p[P_VOICE] = V_POLY;
+                trk_note_on(&trk[0], nt, 127);
+                for (blk = 0; blk < FS * 3u / 2u / CTL; blk++) {
+                    int32_t o[2 * CTL];
+                    uint32_t vi;
+                    mix_block(o, CTL);
+                    for (vi = 0; vi < NVOICE; vi++) {
+                        const voice_t *v = &trk[0].v[vi];
+                        if (v->active && (abs(v->s[1]) >= 150000 || abs(v->s[4]) >= 150000 || abs(v->s[5]) >= 150000 ||
+                                          abs(v->s[6]) >= 150000))
+                            hit++;
+                    }
+                }
+                trk_note_off(&trk[0], nt);
+            }
+        printf("jpz:   blocks ending on the SVF clamp: %u\n", hit);
+        check("headroom: no preset drives the SVF onto its clamp (C2..C7)", !hit);
+    }
     printf(bad ? "jpz: %d FAILED\n" : "jpz: all passed\n", bad);
     return bad != 0;
 }

@@ -27,6 +27,7 @@
 #define JPZ_POLY 8u                      /* POLY: the shared budget's eight (measured: tests/regress.c cpu/JP-Z) */
 #define JPZ_UNI 2u                       /* UNISON: 2 voices x 7 saws */
 #define JPZ_NSAW 7u
+#define JPZ_GAIN 2                       /* after voice_amp (whose input must stay under 2^16): the machine's level */
 
 static const int16_t JPZ_DT[JPZ_NSAW] = {0, 128, -128, 408, -412, 704, -720};
 /* the detune knob, the MCU's curve: 0..63 +1 every second step, 64..80 +1, 81..120 +2, 121..123 +8, 124 +16, 125 +32,
@@ -142,19 +143,21 @@ static void jpz_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
             s += (int32_t)(ph[k] >> 16) - 32768;
             ph[k] += inc[k];
         }
-        x = ((((c * 25 + s * side) >> 4) * norm) >> 12);   /* the mix, at about one saw's level x 0.5 */
+        x = ((((c * 25 + s * side) >> 7) * norm) >> 12);   /* the mix, at about one saw's level x 0.5 (RMS; the peaks,
+                                                            * the saws in phase, about 4x: under the SVF's 150000 and
+                                                            * voice_amp's 2^16; >> 4 here was 8x that: device test 2) */
         if (wb > 1) {                                      /* BAL: the Super Saw against OSC2 */
             int32_t o2 = ((int32_t)(ph2 >> 16) - 32768) >> 1;
             ph2 += inc2;
             x = (x * (127 - wb) + o2 * wb) >> 7;
         } else
             ph2 += inc2;
-        hlp += ((((x << 8) - hlp) >> 6) * (hk >> 3) + 4096) >> 13;   /* the high-pass at the fundamental: a one-pole low-pass, Q8 (no truncation DC), taken off */
+        hlp += (mulq16((x << 8) - hlp, (uint32_t)hk) + 32) >> 6;   /* the high-pass at the fundamental: a one-pole low-pass, Q8 (no truncation DC), taken off; mulq16: no 32-bit wrap */
         x -= hlp >> 8;
         x = jpz_svf(&ca, kres, x, &a1, &a2, mode);
         if (two)
             x = jpz_svf(&cb, 5793, x, &b1, &b2, mode);
-        out[i] += voice_amp(x, m, i);
+        out[i] += voice_amp(x, m, i) << JPZ_GAIN;
     }
     v->ph[0] = ph2;
     v->s[0] = hlp;
