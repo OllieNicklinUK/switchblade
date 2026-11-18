@@ -1,15 +1,22 @@
-# V2 device test 1 (build v0.3-v2test1)
+# V2 device test (build v0.3-v2test2; test1 also works with this sheet)
 
 The first V2 build on a real FM-1. It checks that saving still works on your unit, measures the CPU on the device for
 the first time, and tries the new MIDI. About 30–40 minutes. Note what you see against each step; anything odd is
 worth writing down, even if you are not sure it is a fault.
 
-**The build:** `build/release-0.3-v2test1/switchblade-0.3-v2test1.fwsc`, identity `FM-1_9403`, version `v0.3-v2test1`,
-SHA-256 `97b7c616…24aa5a5` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 and 1.
+**The build (use this one):** `build/release-0.3-v2test2/switchblade-0.3-v2test2.fwsc`, identity `FM-1_9403`, version
+`v0.3-v2test2`, SHA-256 `9229d1c7…2ccf0470` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
+have their own voices**. Its installer site is `build\v2test2-site` (use it in place of `v2test-site` in step 1).
+(test1, `v0.3-v2test1`, `build\v2test-site`: Phases 0 and 1 only, JP-Z, GW-Z and MICRO a placeholder saw.)
 
-**What it is not yet:** JP-Z, GW-Z and MICRO (machines 5, 7 and 8 on the EDIT layer) play a placeholder saw. Presets
-33–50 of the four old machines are copies named SLOT 33..50. The screens look as before, with stand-in colours for the
-new machines. All of that is expected.
+**What it is not yet:** presets 33–50 of the four old machines are copies named SLOT 33..50, and the new machines'
+presets are a first voicing, not yet set by ear. The screens look as before, with stand-in colours for the new
+machines. All of that is expected.
+
+**Also try on test2 (section 3):** JP-Z (key 5): DTN on the machine knob, WID on EDIT page 2 for stereo; GW-Z (key 7):
+an ORGAN preset (ROTR on the machine knob speeds the rotor), a VOX choir, an ADD bell; MICRO (key 8): EPOS on the
+machine knob sweeps the wavetable, GRIT on page 2. For CPU (section 4), add mix D: four parts of JP-Z SUPER PAD
+(preset 17), 2 notes each.
 
 ## 0. Before installing (on 0.2-beta)
 
