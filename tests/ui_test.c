@@ -688,7 +688,7 @@ static int test_midi(void)
     song.playing = 1;
     {
         uint32_t i, held = 0;
-        for (i = 0; i < MQ; i++) midi_in_event(0x643C9909u);
+        for (i = 0; i < MIQ; i++) midi_in_event(0x643C9909u);
         midi_in_event(0x003C8908u);                      /* note-off lost to a full ring */
         events_block(CTL);
         for (i = 0; i < NTRK * NVOICE; i++) held += trk[i / NVOICE].v[i % NVOICE].gate;
@@ -1379,12 +1379,13 @@ static int test_menu_tabs(void)
             }
     }
     ui_prefs = 0;
-    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI MIDI OUT SYSTEM (7 8 6 8 5 6 rows; VOID FOUR: no HOME row; 1.5.5: SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE; "
+    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI MIDI OUT SYSTEM (6 8 6 8 5 7 rows; V2: PC IN, SCREEN WAKE in SYSTEM; VOID FOUR: no HOME row; 1.5.5: SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE; "
                  "FM1-Four: T1..T4 OUT, CLOCK OUT), 1..8 each in a run, fit the page; tab gaps constant (S, LARGE)",
                  ok && MTAB_COUNT == 6u && str_eq(MTAB_NAME[MTAB_MOUT], "MIDI OUT") && mtab_rows(MTAB_MOUT) == 5u &&
                  mtab_first(MTAB_MOUT) == MI_TOUT1 && MI_TAB[MI_CLKOUT] == MTAB_MOUT && MI_LCLEAR + 1u == MI_TOUT1 && str_eq(MTAB_NAME[0], "DISPLAY") && str_eq(MTAB_NAME[MTAB_MIDI], "MIDI") &&
                  mtab_rows(MTAB_DISPLAY) == 6u && MI_TAB[MI_SCOPE] == MTAB_DISPLAY && mtab_rows(MTAB_CONTROL) == 8u && MI_TAB[MI_SELECT] == MTAB_CONTROL && mtab_rows(MTAB_AUDIO) == 6u &&
-                 mtab_rows(MTAB_MIDI) == 8u && MI_TAB[MI_MFOLLOW] == MTAB_MIDI && MI_TAB[MI_SCRWAKE] == MTAB_MIDI && MI_SCRWAKE + 1u == MI_LCLEAR && MI_TAB[MI_LCLEAR] == MTAB_MIDI && MI_TAB[MI_TCH4] == MTAB_MIDI && mtab_rows(MTAB_SYSTEM) == 6u && MI_TAB[MI_TUNE] == MTAB_AUDIO &&   /* (1.5: LEARN CLEAR, HELP) */
+                 mtab_rows(MTAB_MIDI) == 8u && MI_TAB[MI_MFOLLOW] == MTAB_MIDI && MI_TAB[MI_PCIN] == MTAB_MIDI && MI_PCIN + 1u == MI_LCLEAR && MI_TAB[MI_LCLEAR] == MTAB_MIDI && MI_TAB[MI_TCH4] == MTAB_MIDI && mtab_rows(MTAB_SYSTEM) == 7u &&
+                 MI_TAB[MI_SCRWAKE] == MTAB_SYSTEM && MI_SCRWAKE < MI_VALUES &&   /* (V2: PC IN in MIDI, SCREEN WAKE to SYSTEM) */ MI_TAB[MI_TUNE] == MTAB_AUDIO &&   /* (1.5: LEARN CLEAR, HELP) */
                  MI_TAB[MI_MIDIIN] == MTAB_MIDI && MI_TAB[MI_INFO] == MTAB_SYSTEM && MI_INFO >= MI_VALUES);
 
     ui_power_on();
@@ -5772,14 +5773,14 @@ static int test_screen_wake(void)
 
     ui_power_on();
     ok = !(ui_prefs2 & 0x20u) && menu_get(MI_SCRWAKE) == 0u && str_eq(MI_NAME[MI_SCRWAKE], "SCREEN WAKE") &&
-         MI_TAB[MI_SCRWAKE] == MTAB_MIDI && menu_n(MI_SCRWAKE) == 2u && str_eq(menu_vname(MI_SCRWAKE, 0), "+MIDI") &&
+         MI_TAB[MI_SCRWAKE] == MTAB_SYSTEM && menu_n(MI_SCRWAKE) == 2u && str_eq(menu_vname(MI_SCRWAKE, 0), "+MIDI") &&
          str_eq(menu_vname(MI_SCRWAKE, 1), "PANEL") && PREF_WAKE_PANEL == (0x20u << 16) && !MI_PROJECT(MI_SCRWAKE) &&
          menu_valued(MI_SCRWAKE);
     menu_put(MI_SCRWAKE, 1u);
     ok &= ui_prefs2 == 0x20u && menu_get(MI_SCRWAKE) == 1u;
     menu_put(MI_SCRWAKE, 0u);
     ok &= ui_prefs2 == 0u;
-    bad += check("SCREEN WAKE: MENU > MIDI row, +MIDI (default, bit 5 of ui_prefs2 clear) / PANEL", ok);
+    bad += check("SCREEN WAKE: MENU > SYSTEM row (V2; was MIDI), +MIDI (default, bit 5 of ui_prefs2 clear) / PANEL", ok);
 
     {   /* the settings: every older record reads +MIDI; PANEL kept */
         persist_t p = {0};

@@ -364,7 +364,7 @@ static void test_math(void)
 /* ------------------------------------------------------------------ 3 --- */
 static void pkt(uint32_t st, uint32_t d1, uint32_t d2)
 {
-    midi_in_q[mi_w++ % MQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
+    midi_in_q[mi_w++ % MIQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
 }
 /* fn() in a fork()ed child (the tests' state stays as it was); its result */
 static int in_child(int (*fn)(void))

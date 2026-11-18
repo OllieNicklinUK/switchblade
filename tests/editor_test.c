@@ -166,7 +166,7 @@ static int preferences(void)
         host_wire[e - 33] == 0x4d && host_wire[e - 32] == 1 && host_wire[e - 31] == 64u && host_wire[e - 30] == 1 &&   /* (64 kept: 41 01 says 128) */
         host_wire[e - 29] == 0x42 && host_wire[e - 28] == 1 && host_wire[e - 27] == 3 &&
         host_wire[e - 26] == 0x53 && host_wire[e - 25] == 1 && host_wire[e - 24] == 3 &&
-        host_wire[e - 23] == 0x4E && host_wire[e - 22] == 1 && host_wire[e - 21] == 35 &&   /* MENU settings: 35 items (FM1-Four; VOID FOUR: no HOME; Switch Blade: no COLOR) */
+        host_wire[e - 23] == 0x4E && host_wire[e - 22] == 1 && host_wire[e - 21] == 36 &&   /* MENU settings: 36 items (FM1-Four; VOID FOUR: no HOME; Switch Blade: no COLOR; V2: PC IN) */
         host_wire[e - 20] == 0x52 && host_wire[e - 19] == 1 && host_wire[e - 18] == 4 &&   /* RATCH */
         host_wire[e - 17] == 0x4C && host_wire[e - 16] == 1 && host_wire[e - 15] == 1 &&   /* 1.1 parameter locks */
         host_wire[e - 14] == 0x41 && host_wire[e - 13] == 1 && host_wire[e - 12] == 0 && host_wire[e - 11] == 1 &&   /* 1.2: 128 */
@@ -238,8 +238,8 @@ static int framing(void)
     midi_in_event(0xFF07D00Du);
     bad += check("USB program and channel pressure keep their one-byte payload", mi_w == 3u);
     mi_w = UINT32_MAX - 5u; mi_r = mi_w;
-    for (i = 0; i < MQ + 8u; i++) midi_in_event(0x643C9009u);
-    bad += check("USB MIDI ring stops at capacity across counter wrap", mi_w - mi_r == MQ && midi_in_overflow);
+    for (i = 0; i < MIQ + 8u; i++) midi_in_event(0x643C9009u);
+    bad += check("USB MIDI ring stops at capacity across counter wrap", mi_w - mi_r == MIQ && midi_in_overflow);
     mi_r = mi_w; midi_in_event(0x643C9009u);
     bad += check("USB rejects new messages until the audio consumer clears overflow", mi_w == mi_r);
     midi_in_overflow = 0; midi_in_event(0x643C9009u);
@@ -270,14 +270,14 @@ static int uart_recovery(void)
     midi_in_overflow = 0;
     um_byte(0x91); um_byte(70); um_byte(100);
     bad += check("UART recovers immediately on a complete channel message", mi_w == 1u && midi_in_q[0] == 0x64469109u);
-    reset(); mi_w = MQ;
+    reset(); mi_w = MIQ;
     um_byte(0x90); um_byte(60); um_byte(100);
-    bad += check("UART queue overflow latches the same recovery flag as USB", midi_in_overflow && um.drops == 1u && mi_w == MQ);
+    bad += check("UART queue overflow latches the same recovery flag as USB", midi_in_overflow && um.drops == 1u && mi_w == MIQ);
     mi_r = mi_w; um_byte(61); um_byte(101);
     bad += check("UART rejects a new stream until audio clears overflow", mi_w == mi_r && um.drops == 2u);
     midi_in_overflow = 0; um_byte(62); um_byte(102);
     bad += check("UART resumes valid running status after audio clears overflow",
-                 mi_w - mi_r == 1u && midi_in_q[mi_r % MQ] == 0x663E9009u);
+                 mi_w - mi_r == 1u && midi_in_q[mi_r % MIQ] == 0x663E9009u);
     return bad;
 }
 
@@ -728,7 +728,7 @@ static uint32_t menu_set(uint32_t id, int32_t v)            /* -> rc; host_wire[
 #define TCH_NAMES "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,OMNI,OFF"
 static int menu_protocol(void)
 {
-    static const char *const WANT[37][2] = {
+    static const char *const WANT[38][2] = {
         {"(COLOR: gone)", 0}, {"STYLE", "FLAT,LINE"}, {"LARGE", "OFF,ON"}, {"ANIM", "ON,OFF,IDLE"}, {"LEDS", "OFF,DIM LO,DIM HI,INV,INV LO,INV HI"},
         {"HOLD", "0.3 s,0.4 s,0.5 s,0.6 s"}, {"KNOB ACCEL", "OFF,ON"}, {"FX LATCH", "OFF,ON"}, {"BPM LOCK", "OFF,ON"},
         {"SPEAKER EQ", "FLAT,LOWCUT,BASS+"}, {"USB LEVEL", "MASTER,FIXED"}, {"USB SERIAL", "ON,OFF"},
@@ -743,11 +743,12 @@ static int menu_protocol(void)
         {"T1 CHANNEL", TCH_NAMES}, {"T2 CHANNEL", TCH_NAMES}, {"T3 CHANNEL", TCH_NAMES}, {"T4 CHANNEL", TCH_NAMES},   /* (1.5.5) */
         {"AUTO SELECT", "OFF,ON"}, {"SCREEN WAKE", "+MIDI,PANEL"},                                   /* (1.5.5) */
         {"T1 OUT", "INT,EXT,BOTH"}, {"T2 OUT", "INT,EXT,BOTH"}, {"T3 OUT", "INT,EXT,BOTH"}, {"T4 OUT", "INT,EXT,BOTH"},
-        {"CLOCK OUT", "OFF,ON"}};                                                                    /* (FM1-Four) */
-    static const int32_t DEF[37] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0,
-                                    0, 0, 0, 0, 1};   /* (COLOR: the default palette; CLOCK OUT ON) */
-    static const uint8_t TAB[37] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 5, 2, 2, 2, 5, 1, 0, 0, 1, 1, 3, 2, 0, 5, 1, 3, 3, 3, 3, 3, 3,
-                                    4, 4, 4, 4, 4};   /* DISPLAY CONTROL AUDIO MIDI (1.2) MIDI OUT (FM1-Four) SYSTEM */
+        {"CLOCK OUT", "OFF,ON"},                                                                     /* (FM1-Four) */
+        {"PC IN", "ON,OFF"}};                                                                        /* (V2) */
+    static const int32_t DEF[38] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0,
+                                    0, 0, 0, 0, 1, 0};   /* (COLOR: the default palette; CLOCK OUT ON) */
+    static const uint8_t TAB[38] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 5, 2, 2, 2, 5, 1, 0, 0, 1, 1, 3, 2, 0, 5, 1, 3, 3, 3, 3, 3, 5,
+                                    4, 4, 4, 4, 4, 3};   /* (V2: SCREEN WAKE, id 31, in SYSTEM; PC IN, id 37, in MIDI) */   /* DISPLAY CONTROL AUDIO MIDI (1.2) MIDI OUT (FM1-Four) SYSTEM */
     static const char *const TABN[6] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "MIDI OUT", "SYSTEM"};
     int bad = 0, ok = 1;
     uint32_t i, k, n;
@@ -757,7 +758,7 @@ static int menu_protocol(void)
     FILE *jf = json ? fopen(json, "w") : 0;
     reset();
     if (jf) fprintf(jf, "[");
-    for (i = 0; i < 35u; i++) {                         /* (index idx: id idx + 1 (COLOR, id 0, is gone), past VOID FOUR's retired 23 the next) */
+    for (i = 0; i < 36u; i++) {                         /* (index idx: id idx + 1 (COLOR, id 0, is gone), past VOID FOUR's retired 23 the next) */
         uint32_t idx = i;
         i = idx < 22u ? idx + 1u : idx + 2u;
         n = menu_desc(idx, &it);
@@ -780,7 +781,7 @@ static int menu_protocol(void)
         i = idx;
     }
     if (jf) { fprintf(jf, "]\n"); fclose(jf); }
-    bad += check("MENU_DESC: 35 items (1.0.4's 11 in the menu's order (COLOR is gone), then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.5's HELP, 1.5.5's SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE, FM1-Four's T1..T4 OUT, CLOCK OUT), ids 1..36 but 23 (1.3's HOME, gone; 0: COLOR, gone), names, defaults; TUNE a number -50..50 ct", ok);
+    bad += check("MENU_DESC: 36 items (V2: PC IN, id 37; 1.0.4's 11 in the menu's order (COLOR is gone), then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.5's HELP, 1.5.5's SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE, FM1-Four's T1..T4 OUT, CLOCK OUT), ids 1..36 but 23 (1.3's HOME, gone; 0: COLOR, gone), names, defaults; TUNE a number -50..50 ct", ok);
     bad += check("MENU_DESC (1.0.5): after the names (TUNE: the unit) each item's tab, index and name (DISPLAY CONTROL AUDIO MIDI MIDI OUT SYSTEM)", ok);
     {   /* an older editor reads the names and stops: the tab is past them, nothing it reads moved */
         uint32_t m = menu_desc(3, &it), p = 14, q;
@@ -790,12 +791,12 @@ static int menu_protocol(void)
         bad += check("MENU_DESC: the tab comes after every byte of the 1.0.4 reply (older editors ignore it)", ok);
     }
     ok = 1;
-    for (i = 0; i < 35u; i++) {
+    for (i = 0; i < 36u; i++) {
         menu_desc(i, &it);
         ok &= strcmp(it.name, "CALIBRATION") && strcmp(it.name, "ABOUT") && strcmp(it.name, "INFO") && it.id != 23u;
     }
-    n = menu_desc(35, &it);
-    ok &= n == 2u && it.index == 35 && it.id == 127;
+    n = menu_desc(36, &it);
+    ok &= n == 2u && it.index == 36 && it.id == 127;
     n = menu_desc(127, &it);
     bad += check("MENU_DESC: no CALIBRATION / INFO / ABOUT; an index past the list answers index, 127 (no item)",
                  ok && n == 2u && it.index == 127 && it.id == 127);
@@ -842,6 +843,8 @@ static int menu_protocol(void)
           ui_prefs2 == 31u;                             /* (its own byte: SELECT's bit 4 untouched) */
     ok &= menu_set(31, 1) == 3 && ui_prefs2 == 63u && (ui_rec_prefs & 0x80u) && ui_scr == 1u;   /* (1.5.5: SCREEN WAKE
                                                          * PANEL, bit 5 of ui_prefs2; SCREEN OFF's byte untouched) */
+    ok &= menu_set(37, 1) == 3 && ui_prefs2 == (63u | 0x80u) && menu_set(37, 0) == 3 && ui_prefs2 == 63u;   /* (V2: PC IN
+                                                         * OFF, bit 7 of ui_prefs2) */
     for (i = 0; i < 30u; i++) {                         /* MENU_DESC reads them back (by id; 0 and 23 are no item) */
         static const int32_t SET[32] = {2, 1, 1, 1, 1, 3, 1, 1, 1, 2, 1, 0, 2, 0, 2, 1, 1, 2, 1, 1, 1, 2, -13, 0, 1, 1, 9, 16, 17, 0, 1, 1};
         menu_desc(i, &it);
@@ -869,7 +872,7 @@ static int menu_protocol(void)
         static uint8_t fav0[sizeof favorites], set0[sizeof settings];
         uint8_t hold0 = settings_hold, leds0 = settings_leds;
         memcpy(fav0, &favorites, sizeof favorites); memcpy(set0, &settings, sizeof settings);
-        ok = menu_set(37, 1) == 1 && host_wire[6] == 37 && ed_rv(host_wire + 7) == 1;
+        ok = menu_set(38, 1) == 1 && host_wire[6] == 38 && ed_rv(host_wire + 7) == 1;
         ok &= menu_set(126, -3) == 1 && host_wire[6] == 126 && ed_rv(host_wire + 7) == -3;
         ok &= menu_set(127, 0) == 1 && host_wire[6] == 127;
         ok &= !memcmp(fav0, &favorites, sizeof favorites) && !memcmp(set0, &settings, sizeof settings) &&

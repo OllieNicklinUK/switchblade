@@ -71,7 +71,8 @@ static uint32_t up_gen;                      /* bumped on every user bank change
  * ui_input.c seq_entry). 1.5: bit 3 SYSTEM > HELP ON (Discussion #156, ui_help.c). 1.5.5: bit 4 CONTROL > SELECT PAGE
  * (Discussion #188, ui_input.c: SELECT steps the pages; 0 = BPM, as before); bit 5 MIDI > SCREEN WAKE PANEL (scr_input:
  * only the panel wakes SCREEN OFF, as up to 1.5.1; 0, every older setting, = +MIDI, the default: a note-on too).
- * 1.5.6: bit 6 SELECT's second bit (#84: sel_mode). Bit 7 free */
+ * 1.5.6: bit 6 SELECT's second bit (#84: sel_mode). V2: bit 7 MIDI > PC IN OFF (Bank Select and Program Change received
+ * are ignored: midi_pc_poll; 0, every older setting, = ON). The byte is full */
 #define ui_prefs2 (favorites.factory[15][24])
 #define PREF_X 0xFF0000u                       /* (menu_items.c MENU_FLAGS: a bit of ui_prefs2, << 16) */
 #define PREF_SCOPE_MIX (0x01u << 16)
@@ -81,6 +82,7 @@ static uint32_t up_gen;                      /* bumped on every user bank change
 #define PREF_SEL_PAGE (0x10u << 16)
 #define PREF_WAKE_PANEL (0x20u << 16)
 #define PREF_SEL_HI (0x40u << 16)
+#define PREF_PCIN_OFF (0x80u << 16)
 /* MENU > CONTROL > SELECT: 0 BPM, 1 PAGE (1.5.5, #188), 2 MODW, 3 VEL (1.5.6, #84: ui_input.c sel_play), bit 4 and bit 6 of
  * ui_prefs2 (0 in every older setting = BPM; 1.5.5's PAGE keeps its bit; firmware before 1.5.6 reads MODW as BPM and
  * VEL as PAGE (its bit 4), before 1.5.5 both as BPM) */
@@ -205,6 +207,7 @@ static struct {
     } ml;
     volatile uint8_t mpc[NTRK];  /* MIDI Program Change per track, 0x80 | program, 0 none (midi_control.c mpc_io: here
                                   * for the same reason as ml.io; midi_pc_poll) */
+    volatile uint8_t mbank[NTRK];  /* V2: .. its Bank Select, CC0 + 1, 0 none (midi_control.c mbank_io) */
 } ui;
 
 enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER, CF_LOAD_PAT,
@@ -1215,25 +1218,46 @@ static void clean_engine(void) { clean_engine_of(TSEL); }
  * from 0: its n-th preset, loaded as from there (the track's own settings kept, one undo for a run of them). A program
  * past the last is ignored, not wrapped: a number is always the same sound */
 static volatile uint8_t *const mpc_io = ui.mpc;
-static void midi_pc_load(track_t *t, uint32_t n)
+static volatile uint8_t *const mbank_io = ui.mbank;
+/* V2 (Phase 0.5): with a Bank Select before it (bank = CC0 + 1): CC0 0..7 that machine's preset n (the machine changes
+ * if it must, one undo), CC0 8 (MIDI_BANK_USER) user preset slot n (0..31; an empty slot: ignored); another bank: the
+ * PC is ignored (a sound this firmware does not have). No bank: the part's own machine, as before */
+#define MIDI_BANK_USER 8u
+static int up_load_to(track_t *t, uint32_t k);
+static void midi_pc_load(track_t *t, uint32_t bank, uint32_t n)
 {
-    uint32_t e = t->eng_req % NENGINES;
-    if (n >= preset_shown(e))
+    uint32_t e = bank ? bank - 1u : t->eng_req % NENGINES;
+    if (e == MIDI_BANK_USER) {
+        if (n < UP_SLOTS)
+            (void)up_load_to(t, n);
         return;
+    }
+    if (e >= NENGINES || n >= preset_shown(e))
+        return;
+    if (e == t->eng_req) {
+        apply_preset_to(t, n);
+        return;
+    }
+    load_begin(t, UNDO_SOUND);                       /* (one undo: the machine and its preset) */
+    set_engine_of(t, e);
     apply_preset_to(t, n);
+    load_end(t);
 }
 static void midi_pc_poll(void)                       /* main loop (ui_input) */
 {
-    uint32_t k, v;
+    uint32_t k, v, b;
     for (k = 0; k < NTRK; k++) {
         if (!ui.mpc[k])
             continue;
         fm1_irq_off();                               /* (the ISR may note another meanwhile) */
         v = ui.mpc[k];
-        ui.mpc[k] = 0;
+        b = ui.mbank[k];
+        ui.mpc[k] = ui.mbank[k] = 0;
         fm1_irq_on();
+        if (ui_prefs2 & (PREF_PCIN_OFF >> 16))       /* MENU > MIDI > PC IN OFF: bank and program ignored */
+            continue;
         mpc_loading = 1;
-        midi_pc_load(&trk[k], v & 127u);
+        midi_pc_load(&trk[k], b, v & 127u);
         mpc_loading = 0;
         ui.force = 1;
     }

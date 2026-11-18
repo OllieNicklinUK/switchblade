@@ -1297,7 +1297,7 @@ static void events_block(uint32_t n)
     }
     keyboard_block();
     while (mi_r != mi_w) {                            /* USB-MIDI (and TRS) in */
-        uint32_t at = mi_r % MQ, pkt = midi_in_q[at], status = (pkt >> 8) & 0xFFu;
+        uint32_t at = mi_r % MIQ, pkt = midi_in_q[at], status = (pkt >> 8) & 0xFFu;
         uint32_t st = status & 0xF0u, ch = status & 0x0Fu;
         uint32_t d1 = (pkt >> 16) & 0x7Fu, d2 = (pkt >> 24) & 0x7Fu;
         uint32_t source = midi_in_source[at] ? midi_in_source[at] : 1u, ms = midi_in_ms[at];

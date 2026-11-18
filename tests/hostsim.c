@@ -245,10 +245,10 @@ static int tracks_demo(const char *dir, const char *name, uint32_t solo)
         }
         /* (b) MIDI ch 3 into the lead, early in its step 1 */
         if (song.rec && !lead_done && t3->seq_idx == 1u && t3->seq_pos < period / 4u) {
-            midi_in_q[mi_w++ % MQ] = 0x09u | 0x92u << 8 | 84u << 16 | 100u << 24;
+            midi_in_q[mi_w++ % MIQ] = 0x09u | 0x92u << 8 | 84u << 16 | 100u << 24;
             lead_done = 1;
         } else if (lead_done == 1u && t3->seq_idx == 2u) {
-            midi_in_q[mi_w++ % MQ] = 0x08u | 0x82u << 8 | 84u << 16;
+            midi_in_q[mi_w++ % MIQ] = 0x08u | 0x82u << 8 | 84u << 16;
             lead_done = 2;
         }
         /* (c) the keys, track 2 selected: two keys at once into the empty pad step 14 */

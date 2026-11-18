@@ -11,6 +11,7 @@ typedef struct {
     uint8_t owned[NTRK];                    /* held/pedal notes per track, at most 128 per channel */
     uint8_t ready, semis, cents;
     uint8_t rpn_msb, rpn_lsb;
+    uint8_t bank;                           /* V2: CC0 received + 1, taken by the next Program Change; 0 none */
 } midi_channel_t;
 static midi_channel_t midi_ch[16];
 /* Low bits: track + 1. High bit: key released, held by its channel's pedal. */
@@ -230,6 +231,10 @@ static const uint8_t MIDI_CC_MAP[][2] = {          /* the common rows, the same 
     {5, P_GLIDE}, {CC_VOL, P_LEVEL}, {10, P_PAN}, {72, P_REL}, {73, P_ATK}, {75, P_DEC},
     {91, P_REV}, {93, P_CHOR}, {94, P_DLY},
 };
+/* V2 (Phase 0.5): CC 102..109 are the machine's own eight, P_E0..P_E7, in and out on every machine (undefined in the
+ * MIDI spec: they clash with nothing; a Syntakt MIDI track's 8 CC slots map onto them one to one). One of them may
+ * also be one of the four EDIT controls (CUT on CC74 too): in, both set it; out, its EDIT control's CC only */
+#define CC_E0 102u
 /* the parameter CC cc sets on track t, -1 none */
 static int32_t cc_param(const track_t *t, uint32_t cc)
 {
@@ -241,6 +246,8 @@ static int32_t cc_param(const track_t *t, uint32_t cc)
     for (i = 0; i < NELEM(MIDI_CC_MAP); i++)
         if (MIDI_CC_MAP[i][0] == cc)
             return MIDI_CC_MAP[i][1];
+    if (cc - CC_E0 < 8u)
+        return (int32_t)(P_E0 + cc - CC_E0);
     return -1;
 }
 /* .. and the inverse: the CC that parameter id of track t goes out on, -1 none (the four controls first: a machine's
@@ -255,6 +262,8 @@ static int32_t param_cc(const track_t *t, uint32_t id)
     for (i = 0; i < NELEM(MIDI_CC_MAP); i++)
         if (MIDI_CC_MAP[i][1] == id)
             return MIDI_CC_MAP[i][0];
+    if (id - P_E0 < 8u)
+        return (int32_t)(CC_E0 + id - P_E0);
     return -1;
 }
 /* ---------------------------------------------------------- MIDI OUT --- */
@@ -273,7 +282,8 @@ static int32_t param_cc(const track_t *t, uint32_t id)
  * sent, so the external patch the PC chose is not overwritten by the FM-1's. Turning a track to EXT / BOTH sends
  * nothing until a value changes. The clock (G_CLKOUT): F8 at 24 ppqn locked to the sequencer's samples, FA on PLAY
  * (and RESTART), FC on STOP; none while the transport follows an external clock (no loop) */
-#define MOUT_NCC (4u + NELEM(MIDI_CC_MAP))          /* a track's CCs out: EDIT K1..K4, then the common rows */
+#define MOUT_NMAP (4u + NELEM(MIDI_CC_MAP))         /* EDIT K1..K4, then the common rows .. */
+#define MOUT_NCC (MOUT_NMAP + 8u)                   /* .. then (V2) E0..E7 on CC 102..109: a track's CCs out */
 #define MOUT_CC_BLOCK 8u                            /* at most this many CCs a block (all tracks) ... */
 #define MOUT_ROOM 16u                               /* .. while the ring keeps this much free for notes and the clock */
 static uint8_t mout_held[NTRK][16];                 /* notes sent and not ended yet, a bit per note */
@@ -302,16 +312,26 @@ static int mout_try(uint32_t st, uint32_t d1, uint32_t d2)
 }
 static uint32_t mout_slot_param(const track_t *t, uint32_t s)
 {
-    return s < 4u ? ENGINES[eng_idx(t->eng_req)]->knob[s] : MIDI_CC_MAP[s - 4u][1];
+    return s < 4u ? ENGINES[eng_idx(t->eng_req)]->knob[s] : s < MOUT_NMAP ? MIDI_CC_MAP[s - 4u][1] : P_E0 + s - MOUT_NMAP;
 }
-static uint32_t mout_slot_cc(uint32_t s) { return s < 4u ? CC_KNOB[s] : MIDI_CC_MAP[s - 4u][0]; }
-static int32_t mout_slot(const track_t *t, uint32_t id)       /* the slot of parameter id, -1 not mapped */
+static uint32_t mout_slot_cc(uint32_t s)
 {
-    uint32_t s;
-    for (s = 0; s < MOUT_NCC; s++)
+    return s < 4u ? CC_KNOB[s] : s < MOUT_NMAP ? MIDI_CC_MAP[s - 4u][0] : CC_E0 + s - MOUT_NMAP;
+}
+/* the next slot from s on of parameter id, -1 none (V2: an E value can have two, its EDIT control's and CC 102..109) */
+static int32_t mout_slot_from(const track_t *t, uint32_t id, uint32_t s)
+{
+    for (; s < MOUT_NCC; s++)
         if (mout_slot_param(t, s) == id)
             return (int32_t)s;
     return -1;
+}
+static int32_t mout_slot(const track_t *t, uint32_t id) { return mout_slot_from(t, id, 0); }   /* -1 not mapped */
+/* slot s sends: the first of its parameter's (an E value one of the four EDIT controls goes out on that control's CC
+ * only, CUT on CC74 not also CC106: one CC per parameter out; in, both set it) */
+static int mout_slot_live(const track_t *t, uint32_t s)
+{
+    return s < MOUT_NMAP || mout_slot(t, mout_slot_param(t, s)) == (int32_t)s;
 }
 /* parameter id of t as a CC value 0..127, the inverse of midi_cc_set; -1 none (no range) */
 static int32_t mout_value(const track_t *t, uint32_t id)
@@ -334,9 +354,11 @@ static void mout_resync(const track_t *t)           /* every mapped value taken 
 /* parameter id of t was set by a CC received: its value is the external gear's already */
 static void mout_heard(const track_t *t, uint32_t id)
 {
-    int32_t s = mout_slot(t, id), v;
-    if (s >= 0 && (v = mout_value(t, id)) >= 0)
-        mout_last[trk_index(t)][s] = (uint8_t)v;
+    int32_t s, v = mout_value(t, id);
+    if (v < 0)
+        return;
+    for (s = mout_slot(t, id); s >= 0; s = mout_slot_from(t, id, (uint32_t)s + 1u))
+        mout_last[trk_index(t)][s] = (uint8_t)v;      /* (every slot of it: none sends it back) */
 }
 /* every note t has sent ends (note-offs on the channel they went on) */
 static void mout_off_all(track_t *t)
@@ -401,13 +423,18 @@ static void mout_param(track_t *t, uint32_t id)
     int32_t s = mout_slot(t, id), v = s >= 0 ? mout_value(t, id) : -1;
     if (v < 0 || t->p[P_MOUT] == MOUT_INT)
         return;
-    mout_last[trk_index(t)][s] = (uint8_t)v;
+    mout_heard(t, id);                                /* (every slot of it as sent: it goes out once) */
     mout_send(0xB0u | trk_midi_ch(trk_index(t)), mout_slot_cc((uint32_t)s), (uint32_t)v);
 }
-static void mout_program(track_t *t)                /* Program Change: the track's preset number */
+/* Program Change: the track's preset number; V2: after CC0 = its machine (the bank select midi_control takes in), so
+ * what a DAW records chooses the same sound again */
+static void mout_program(track_t *t)
 {
-    if (t->p[P_MOUT] != MOUT_INT)
-        mout_send(0xC0u | trk_midi_ch(trk_index(t)), t->preset & 127u, 0);
+    uint32_t ch = trk_midi_ch(trk_index(t));
+    if (t->p[P_MOUT] == MOUT_INT)
+        return;
+    mout_send(0xB0u | ch, 0, t->eng_req % NENGINES);
+    mout_send(0xC0u | ch, t->preset & 127u, 0);
 }
 static void mout_clock(uint32_t rt)                 /* 0xF8 / 0xFA / 0xFC (mout_block: CLOCK OUT on, INT clock) */
 {
@@ -448,7 +475,7 @@ static __attribute__((noinline)) void mout_block(uint32_t seq_n, uint32_t clock_
             continue;
         }
         for (s = 0; s < MOUT_NCC && sent < MOUT_CC_BLOCK; s++) {
-            int32_t v = mout_value(t, mout_slot_param(t, s));
+            int32_t v = mout_slot_live(t, s) ? mout_value(t, mout_slot_param(t, s)) : -1;
             if (v < 0 || v == mout_last[k][s])
                 continue;
             if (!usb.config)                         /* (nobody listens: taken as sent) */
@@ -558,6 +585,11 @@ static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
     midi_channel_t *c = midi_channel(ch);
     uint32_t i, mask;
     switch (cc) {
+    case 0:                                        /* V2: Bank Select, the machine (0..7) or 8 USER: the next PC's */
+        c->bank = (uint8_t)(value + 1u);
+        break;
+    case 32:                                       /* (Bank Select LSB: accepted, no meaning) */
+        break;
     case 1:
         c->wheel = (uint8_t)value;
         break;
@@ -628,7 +660,7 @@ static void __attribute__((noinline)) midi_route_block(void)
         for (note = 0; note < 128u; note++)
             if (midi_notes[ch][note])
                 midi_release(ch, note);
-        c->pedal = c->wheel = 0;
+        c->pedal = c->wheel = c->bank = 0;
         c->bend = 0;
         c->rpn_msb = c->rpn_lsb = 127;
     }
@@ -636,8 +668,11 @@ static void __attribute__((noinline)) midi_route_block(void)
 
 /* Program Change (1.5.1, #179 by renebohne): the track the channel plays (ROUT as for notes) takes program d1. Only
  * noted here, 0x80 | d1 per track (a later one before the main loop wins): a sound load is the main loop's work
- * (undo, motion, FM6's patch), never the audio ISR's. ui.mpc (ui.c; a build without the UI: none) */
+ * (undo, motion, FM6's patch), never the audio ISR's. ui.mpc (ui.c; a build without the UI: none). V2: with it the
+ * channel's bank (CC0 + 1, 0 none: the part's machine as it is), ui.mbank; the bank is the one PC's, not kept for the
+ * next. MENU > MIDI > PC IN OFF: the main loop discards both (ui.c midi_pc_poll) */
 static volatile uint8_t *const mpc_io;
+static volatile uint8_t *const mbank_io;
 
 /* Keep the occasional controller/panic dispatch outside the hot rendering loop. Channel voice messages only
  * (realtime and clock are handled in events_block, SysEx never reaches here). With ROUT CH1-4 channels
@@ -657,6 +692,10 @@ static void __attribute__((noinline)) midi_event(uint32_t st, uint32_t ch, uint3
         midi_control(ch, d1, d2);
     } else if (st == 0xD0u)
         mod_midi(midi_track(ch), st, d1, d2);
-    else if (st == 0xC0u && mpc_io)                /* Program Change: the main loop loads it (ui.c midi_pc_poll) */
-        mpc_io[trk_index(midi_track(ch))] = (uint8_t)(0x80u | d1);
+    else if (st == 0xC0u && mpc_io) {              /* Program Change: the main loop loads it (ui.c midi_pc_poll) */
+        uint32_t k = trk_index(midi_track(ch));
+        mbank_io[k] = midi_channel(ch)->bank;
+        midi_channel(ch)->bank = 0;
+        mpc_io[k] = (uint8_t)(0x80u | d1);
+    }
 }

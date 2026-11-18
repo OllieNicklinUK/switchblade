@@ -423,11 +423,11 @@ static int held_gates(char *who, size_t wn)
             }
     return (int)n;
 }
-static void midi_pkt(uint32_t st, uint32_t d1, uint32_t d2)   /* as usb.c: the queue holds MQ packets */
+static void midi_pkt(uint32_t st, uint32_t d1, uint32_t d2)   /* as usb.c: the queue holds MIQ packets */
 {
-    if (mi_w - mi_r >= MQ)
+    if (mi_w - mi_r >= MIQ)
         blk();
-    midi_in_q[mi_w++ % MQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
+    midi_in_q[mi_w++ % MIQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
 }
 
 /* the shared budget: 4 POLY parts (OB-Z, DRIFT, WAVE, ACID) play random notes on and off for

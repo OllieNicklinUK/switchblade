@@ -133,8 +133,8 @@ int main(void)
         midi_in_event(0x0000FB0Fu);
         midi_in_event(0x0000FE0Fu);                  /* active sensing ignored */
         bad += (uint32_t)check("clock: timestamps and USB/TRS source, no active sensing",
-            mi_w == w0 + 2u && midi_in_ms[w0 % MQ] == 1234u && midi_in_source[w0 % MQ] == 2u &&
-            midi_in_source[(w0 + 1u) % MQ] == 1u);
+            mi_w == w0 + 2u && midi_in_ms[w0 % MIQ] == 1234u && midi_in_source[w0 % MIQ] == 2u &&
+            midi_in_source[(w0 + 1u) % MIQ] == 1u);
     }
     {   /* 4-track routing reads the channel from the packet as for USB-MIDI: cable 0, CIN = status >> 4 */
         static const uint8_t chs[] = {0x90, 60, 1, 0x91, 61, 2, 0x92, 62, 3, 0x99, 36, 4, 0x9F, 63, 5, 0x89, 36, 0};
@@ -142,7 +142,7 @@ int main(void)
         for (i = 0; i < sizeof chs; i++)
             um_byte(chs[i]);
         for (i = 0; i < 6u; i++) {
-            uint32_t pkt = midi_in_q[(w0 + i) % MQ], st = chs[3u * i];
+            uint32_t pkt = midi_in_q[(w0 + i) % MIQ], st = chs[3u * i];
             ok &= mi_w == w0 + 6u && (pkt & 0xFFu) == (st >> 4) && ((pkt >> 8) & 0xFFu) == st &&
                   ((pkt >> 16) & 0x7Fu) == chs[3u * i + 1u] && (pkt >> 24) == chs[3u * i + 2u];
         }

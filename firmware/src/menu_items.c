@@ -16,9 +16,10 @@
  * nothing of theirs is in the settings record (MI_PROJECT: menu_get / menu_put read and write song.g) */
 enum { MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_HOLD, MI_ACCEL, MI_LATCH, MI_BPMLOCK, MI_SCLLED,
        MI_PREVIEW, MI_CHADD, MI_SELECT, MI_LOWCUT, MI_USB,
-       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_TCH1, MI_TCH2, MI_TCH3, MI_TCH4, MI_MFOLLOW, MI_SCRWAKE, MI_LCLEAR,
-       MI_TOUT1, MI_TOUT2, MI_TOUT3, MI_TOUT4, MI_CLKOUT, MI_SERIAL, MI_RESTORE, MI_HELP, MI_PANEL, MI_INFO,
+       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_TCH1, MI_TCH2, MI_TCH3, MI_TCH4, MI_MFOLLOW, MI_PCIN, MI_LCLEAR,
+       MI_TOUT1, MI_TOUT2, MI_TOUT3, MI_TOUT4, MI_CLKOUT, MI_SERIAL, MI_RESTORE, MI_HELP, MI_SCRWAKE, MI_PANEL, MI_INFO,
        MI_ABOUT, MI_COUNT };
+                                                       /* (V2: PC IN in MIDI, SCREEN WAKE moved to SYSTEM to make room) */
                                                        /* (1.1: the metronome's rows in AUDIO; 1.2: RESTORE LAST in
                                                         * SYSTEM, SCALE LEDS STEP PREVIEW CHORD ENTRY in CONTROL, SCOPE in
                                                         * DISPLAY, TUNE in AUDIO, MIDI IN in MIDI, INFO in SYSTEM;
@@ -36,8 +37,9 @@ static const char *const MI_NAME[MI_COUNT] = {"STYLE", "LARGE", "ANIM", "LEDS", 
                                               "FX LATCH", "BPM LOCK", "SCALE LEDS", "STEP PREVIEW", "CHORD ENTRY", "SELECT",
                                               "SPEAKER EQ", "USB LEVEL", "CLICK", "CLICK LEVEL", "COUNT-IN", "TUNE",
                                               "MIDI IN", "T1 CHANNEL", "T2 CHANNEL", "T3 CHANNEL", "T4 CHANNEL",
-                                              "AUTO SELECT", "SCREEN WAKE", "LEARN CLEAR",
-                                              "T1 OUT", "T2 OUT", "T3 OUT", "T4 OUT", "CLOCK OUT", "USB SERIAL", "RESTORE LAST", "HELP", "CALIBRATION", "INFO",
+                                              "AUTO SELECT", "PC IN", "LEARN CLEAR",
+                                              "T1 OUT", "T2 OUT", "T3 OUT", "T4 OUT", "CLOCK OUT", "USB SERIAL", "RESTORE LAST", "HELP",
+                                              "SCREEN WAKE", "CALIBRATION", "INFO",
                                               "ABOUT"};
 /* 1.0.5: the MENU's tabs (ui_menu.c: ALGORITHM steps between them, PRESETS among one tab's rows; the editor gets a
  * row's tab after its MENU_DESC reply). A tab's rows follow each other in MI order (tests/ui_test.c checks it); at
@@ -62,11 +64,12 @@ static const uint8_t MI_TAB[MI_COUNT] = {
     MTAB_MIDI,                                                              /* MIDI IN (1.2) */
     MTAB_MIDI, MTAB_MIDI, MTAB_MIDI, MTAB_MIDI,                             /* T1..T4 CHANNEL (1.5.5) */
     MTAB_MIDI,                                                              /* AUTO SELECT (1.5.5) */
-    MTAB_MIDI,                                                              /* SCREEN WAKE (1.5.5: DISPLAY is full) */
+    MTAB_MIDI,                                                              /* PC IN (V2) */
     MTAB_MIDI,                                                              /* LEARN CLEAR (1.5) */
     MTAB_MOUT, MTAB_MOUT, MTAB_MOUT, MTAB_MOUT,                             /* T1..T4 OUT (FM1-Four: MIDI is full) */
     MTAB_MOUT,                                                              /* CLOCK OUT (FM1-Four) */
     MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM,                                  /* USB SERIAL, RESTORE LAST, HELP (1.5) */
+    MTAB_SYSTEM,                                                            /* SCREEN WAKE (1.5.5 in MIDI; V2 here) */
     MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM,                                  /* CALIBRATION, INFO (1.2), ABOUT */
 };
 /* TUNE: the project's tuning in cents (G_TUNE, -50..+50); as a row its values 0..TUNE_N - 1 (value - TUNE_MIN). The
@@ -111,6 +114,7 @@ static const menu_flag_t MENU_FLAGS[] = {
     {MI_HELP, PREF_HELP, {"OFF", "ON"}},               /* 1.5, Discussion #156: ON, a hint per page / layer (ui_help.c) */
     {MI_MFOLLOW, PREF_MIDI_FOLLOW, {"OFF", "ON"}},     /* 1.5.5, #208: ON, MIDI IN notes select their track (ui_input.c) */
     {MI_SCRWAKE, PREF_WAKE_PANEL, {"+MIDI", "PANEL"}}, /* 1.5.5: PANEL, only the panel wakes SCREEN OFF (ui.c scr_input) */
+    {MI_PCIN, PREF_PCIN_OFF, {"ON", "OFF"}},           /* V2: OFF, Bank Select / Program Change in ignored (ui.c midi_pc_poll) */
 };
 /* SPEAKER EQ (settings.lowcut, fx.c fx_lowcut): an EQ on the master for the small speaker, not a speaker switch
  * (#42: "OFF" read as the speaker off). FLAT is the old OFF (0, stored as before). The built-in speaker cannot be

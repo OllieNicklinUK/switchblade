@@ -166,21 +166,42 @@ static volatile uint32_t so_w, so_r;
 #endif
 
 /* MIDI rings: 4-byte USB-MIDI event packets */
-#define MQ 64u
-static uint32_t midi_in_q[MQ], midi_out_q[MQ];
-static uint32_t midi_in_ms[MQ];
-static uint8_t midi_in_source[MQ];                    /* 1 USB, 2 TRS */
+/* V2 (Phase 0.5): the IN ring MIQ 256 (was 64, shared with OUT's MQ). USB fills it to three quarters at most (ep1_take:
+ * the host is NAKed past that, nothing lost); the last quarter is TRS's, which cannot wait. Above three quarters a
+ * CC, aftertouch or pitch bend is shed (a later one carries the value: midi_shed), never a note, a pedal, a channel
+ * mode message (CC120..127), a bank select or a Program Change. Only a full ring sets midi_in_overflow (the panic);
+ * a clock message that finds it full is dropped (a timing glitch, not a hung note) */
+#define MQ 64u                                          /* the OUT ring */
+#define MIQ 256u                                        /* the IN ring */
+#define MIQ_SOFT (MIQ * 3u / 4u)
+static uint32_t midi_in_q[MIQ], midi_out_q[MQ];
+static uint32_t midi_in_ms[MIQ];
+static uint8_t midi_in_source[MIQ];                   /* 1 USB, 2 TRS */
 static volatile uint32_t fm1_ms;                    /* also declared by core.h; parser-only host tests */
 static volatile uint32_t mi_w, mi_r, mo_w, mo_r;
 static volatile uint8_t midi_in_overflow;               /* audio ISR discards a broken stream and releases notes */
+static volatile uint32_t midi_in_shed;                  /* CC / AT / bend shed above three quarters (a count) */
+
+static int midi_shed(uint32_t pkt)                      /* 1: an event a later one replaces (CIN A, B, D, E) */
+{
+    uint32_t cin = pkt & 0xFu, cc = (pkt >> 16) & 0x7Fu;
+    if (cin == 0xAu || cin == 0xDu || cin == 0xEu)
+        return 1;
+    return cin == 0xBu && cc && cc != 32u && cc != 64u && cc < 120u;
+}
 
 static int midi_enqueue(uint32_t pkt, uint32_t source)
 {
-    uint32_t at = mi_w % MQ;
+    uint32_t at = mi_w % MIQ, used = mi_w - mi_r;
     if (midi_in_overflow)
         return 0;
-    if (mi_w - mi_r >= MQ) {
-        midi_in_overflow = 1;
+    if (used >= MIQ_SOFT && midi_shed(pkt)) {
+        midi_in_shed++;
+        return 1;                                       /* (taken: not an overflow) */
+    }
+    if (used >= MIQ) {
+        if ((pkt & 0xFu) != 0xFu)                       /* (a clock message: dropped, no panic) */
+            midi_in_overflow = 1;
         return 0;
     }
     midi_in_q[at] = pkt;
@@ -828,16 +849,17 @@ static void midi_in_event(uint32_t pkt)                 /* one USB-MIDI event pa
     }
 }
 
-/* one EP1 OUT packet (<= 16 events) into the MIDI ring, or 0: fewer than 16 + 8 slots free, so the packet
- * stays (the host is NAKed) and is retried next poll; a burst never overflows the ring (that panics), and
- * 8 slots stay for TRS MIDI, which shares the ring and cannot wait (31250 baud: about 3 messages a half).
+/* one EP1 OUT packet (<= 16 events) into the MIDI ring, or 0: it would take the ring past three quarters, so the
+ * packet stays (the host is NAKed) and is retried next poll; a burst never overflows the ring (that panics), is never
+ * shed (midi_enqueue sheds above three quarters only), and the last quarter stays for TRS MIDI, which shares the ring
+ * and cannot wait (31250 baud: about 3 messages a half). V2: was 16 + 8 slots of 64.
  * The update loader never drains the ring (it wants SysEx only): no back-pressure there. */
-#define EP1_ROOM (16u + 8u)
+#define EP1_ROOM (16u + (MIQ - MIQ_SOFT))
 static int ep1_take(const uint8_t *b, uint32_t n)
 {
     uint32_t i;
 #ifndef FELUCCA_LOADER
-    if (MQ - (mi_w - mi_r) < EP1_ROOM)
+    if (MIQ - (mi_w - mi_r) < EP1_ROOM)
         return 0;
 #endif
     for (i = 0; i + 3u < n; i += 4u)

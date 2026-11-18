@@ -41,6 +41,7 @@ static const uint8_t ED_MENU[][2] = {
     {MI_TOUT1, 32}, {MI_TOUT2, 33}, {MI_TOUT3, 34}, {MI_TOUT4, 35},   /* FM1-Four: T1..T4 OUT, the tracks' P_MOUT (INT EXT
                                                        * BOTH), the project's as MIDI IN (rc 0), MIDI OUT */
     {MI_CLKOUT, 36},                                   /* FM1-Four: CLOCK OUT OFF / ON, the project's G_CLKOUT, MIDI OUT */
+    {MI_PCIN, 37},                                     /* V2: PC IN ON / OFF, a setting, MIDI (SCREEN WAKE: now SYSTEM) */
 };
 #define ED_MENU_N NELEM(ED_MENU)
 

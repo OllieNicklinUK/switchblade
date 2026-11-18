@@ -357,19 +357,19 @@ static int up_rename(uint32_t k, const char *name) { return up_rename_cat(k, nam
 
 /* slot k -> the selected part's sound: engine and every parameter except the track's own (param_kept:
  * the mix, ARP, SCL, the pattern parameters, the SLICER). The steps stay: the record's pattern is
- * loaded only from SAVE > PHRASES (up_pat_load). 0 ok, 1 empty */
-static int up_load(uint32_t k)
+ * loaded only from SAVE > PHRASES (up_pat_load). 0 ok, 1 empty. V2: up_load_to, any part (MIDI bank 8: ui.c
+ * midi_pc_load) */
+static int up_load_to(track_t *t, uint32_t k)
 {
     const up_rec_t *r;
     int16_t v[P_COUNT];
     uint32_t i;
-    track_t *t = TSEL;
     if (!up_used(k))
         return 1;
     r = up_rec(k);
     up_values(r, v);
     load_begin(t, UNDO_SOUND);                          /* (ui.c: the copy for SAVE held = undo) */
-    panic_req |= (uint8_t)(1u << song.sel);
+    panic_req |= (uint8_t)(1u << trk_index(t));
     fm1_irq_off();                                      /* the audio ISR must not see half a sound */
     t->eng_req = r->engine;
     for (i = 0; i < P_COUNT; i++)
@@ -379,10 +379,12 @@ static int up_load(uint32_t k)
     fm1_irq_on();
     t->user = (uint8_t)(k + 1u);
     load_end(t);
-    sync_reload = 1;
+    if (t == TSEL)
+        sync_reload = 1;
     ui.force = 1;
     return 0;
 }
+static int up_load(uint32_t k) { return up_load_to(TSEL, k); }
 
 /* the patterns of the user presets (SAVE > PHRASES lists them after the factory ones, ui.c pat_count) */
 static int up_has_pat(uint32_t k) { return up_used(k) && !up_pat_empty(up_rec(k)); }

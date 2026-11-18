@@ -11,7 +11,7 @@ static void midi_test_reset(void)
     memset(midi_owners, 0, sizeof midi_owners); memset(midi_bend_q8, 0, sizeof midi_bend_q8);
     memset(midi_bend_target, 0, sizeof midi_bend_target); memset(&midi_clock, 0, sizeof midi_clock);
     memset(&um, 0, sizeof um); memset(midi_in_source, 0, sizeof midi_in_source);
-    mi_r = mi_w = 0; midi_in_overflow = 0; midi_beat_samples = 0;
+    mi_r = mi_w = 0; midi_in_overflow = 0; midi_in_shed = 0; midi_beat_samples = 0;
     fm1_in.notes = kb_prev = 0; fm1_ms = 0; song.sel = 0;
     memset(song.mch, 0, sizeof song.mch); song.g[G_ROUTE] = 0; midi_seen = 0; memset(midi_lit_ms, 0, sizeof midi_lit_ms);
     events_block(CTL);
@@ -86,7 +86,7 @@ static int ownership_test(void)
     panic_req |= 1u; events_block(CTL);
     queued(0x90, 67, 100, 1); queued(0xB4, 64, 0, 1);
     bad += check("preset panic forgets old pedal owners so later pedal-up preserves new notes", !midi_notes[4][67] && gate_note(&trk[0], 67));
-    for (uint32_t i = 0; i <= MQ; i++) midi_enqueue(0x09u | 0x90u << 8 | 70u << 16 | 100u << 24, 1);
+    for (uint32_t i = 0; i <= MIQ; i++) midi_enqueue(0x09u | 0x90u << 8 | 70u << 16 | 100u << 24, 1);
     events_block(CTL);
     bad += check("queue overflow recovers ownership and releases stuck notes", !midi_in_overflow && mi_r == mi_w && !midi_owners[0] && !gate_note(&trk[0], 67));
     return bad;
@@ -209,22 +209,149 @@ static int usb_burst_test(void)
     for (e = 0; e < 16; e++) {                       /* CC7 = 100 on 16 channels */
         pkt[4 * e] = 0x0B; pkt[4 * e + 1] = (uint8_t)(0xB0 | e); pkt[4 * e + 2] = 7; pkt[4 * e + 3] = 100;
     }
-    for (k = 0; k < 5; k++)                          /* 5 polls at 2 kHz before the next half drains */
+    for (k = 0; k < MIQ / 16u + 2u; k++)             /* polls at 2 kHz before the next half drains */
         taken += (uint32_t)ep1_take(pkt, sizeof pkt);
-    bad += check("a USB burst fills the MIDI ring without overflowing it", taken == 3u && !midi_in_overflow && mi_w - mi_r == 48u);
-    bad += check("the packet that does not fit is refused (left for the next poll)", !ep1_take(pkt, sizeof pkt) && mi_w - mi_r == 48u);
-    for (e = 0; e < 8; e++)                          /* TRS MIDI meanwhile: its 8 slots are free */
-        midi_in_event(0x0Bu | 0xB1u << 8 | 1u << 16 | e << 24);
-    bad += check("TRS MIDI into a ring full of USB still fits (no overflow)", !midi_in_overflow && mi_w - mi_r == 56u);
+    bad += check("a USB burst fills the MIDI ring to three quarters (V2), never past, never shed",
+                 taken == MIQ_SOFT / 16u && !midi_in_overflow && mi_w - mi_r == MIQ_SOFT && !midi_in_shed);
+    bad += check("the packet that does not fit is refused (left for the next poll)", !ep1_take(pkt, sizeof pkt) && mi_w - mi_r == MIQ_SOFT);
+    for (e = 0; e < 8; e++)                          /* TRS MIDI meanwhile: its notes have the last quarter */
+        midi_enqueue(0x09u | 0x90u << 8 | (60u + e) << 16 | 100u << 24, 2u);
+    for (e = 0; e < 8; e++)                          /* .. its CCs above three quarters are shed */
+        midi_enqueue(0x0Bu | 0xB1u << 8 | 1u << 16 | e << 24, 2u);
+    bad += check("TRS MIDI into a ring full of USB: the notes fit, the CCs are shed (no overflow)",
+                 !midi_in_overflow && mi_w - mi_r == MIQ_SOFT + 8u && midi_in_shed == 8u);
     events_block(CTL);
-    bad += check("the ring drains with no panic: the held note keeps sounding", gate_note(&trk[0], 48) && mi_r == mi_w);
-    bad += check("the refused packet is taken once the ring has room", ep1_take(pkt, sizeof pkt) && mi_w - mi_r == 16u);
+    bad += check("the ring drains with no panic: the held note keeps sounding", gate_note(&trk[0], 48) && gate_note(&trk[0], 67) && mi_r == mi_w);
+    for (e = 0; e < 8; e++)
+        midi_enqueue(0x08u | 0x80u << 8 | (60u + e) << 16, 2u);
+    bad += check("the refused packet is taken once the ring has room", ep1_take(pkt, sizeof pkt) && mi_w - mi_r == 24u);
     events_block(CTL);
-    bad += check("the held note survives all 88 events", gate_note(&trk[0], 48) && !midi_in_overflow);
-    for (k = 0; k < 3; k++) ep1_take(pkt, sizeof pkt);
-    midi_in_event(0x09u | 0x90u << 8 | 50u << 16 | 100u << 24);   /* one more event: 49 used, 15 free */
-    bad += check("free space below one packet refuses a whole packet", !ep1_take(pkt, sizeof pkt) && !midi_in_overflow);
+    bad += check("the held note survives them all", gate_note(&trk[0], 48) && !gate_note(&trk[0], 60) && !midi_in_overflow);
+    for (k = 0; k < MIQ_SOFT / 16u - 1u; k++) ep1_take(pkt, sizeof pkt);
+    midi_in_event(0x09u | 0x90u << 8 | 50u << 16 | 100u << 24);   /* one more event: a packet would pass three quarters */
+    bad += check("room below one packet under three quarters refuses a whole packet", !ep1_take(pkt, sizeof pkt) && !midi_in_overflow);
     events_block(CTL);
+    midi_in_shed = 0;
+    return bad;
+}
+/* V2 (Phase 0.5): Bank Select picks the machine (CC0 0..7, 8 USER), PC IN OFF, CC 102..109 = E0..E7 in and out, a TRS
+ * CC burst with notes held */
+static void pc(uint32_t ch, uint32_t prog);
+static int v2_midi_test(void)
+{
+    int bad = 0, ok;
+    uint32_t e, i, n;
+    track_t *t;
+    midi_test_reset();
+    for (i = 0; i < NTRK; i++)
+        set_engine_of(&trk[i], 0);
+    for (e = 0; e < NENGINES; e++) {                     /* bank e, program 7, channel 1 + e % 4: that machine's preset 7 */
+        uint32_t ch = e % NTRK;
+        queued(0xB0u | ch, 0, e, 1); pc(ch, 7); frame();
+        ok = trk[ch].eng_req == e && trk[ch].preset == 7u && !trk[ch].user;
+        if (!ok) printf("    (bank %u: engine %u preset %u)\n", e, trk[ch].eng_req, trk[ch].preset);
+        bad += check("  bank + program on ch 1..4: that machine's preset on that part", ok);
+    }
+    t = &trk[1];
+    set_engine_of(t, ENGI_ACID);
+    pc(1, 4); frame();
+    bad += check("  a PC with no bank before it keeps the part's machine (the bank was the last PC's)", t->eng_req == ENGI_ACID && t->preset == 4u);
+    queued(0xB1, 0, ENGI_WAVE, 1); queued(0xB1, 32, 5, 1); pc(1, NPRESET); frame();
+    bad += check("  a program past the machine's last: nothing changes (not even the machine)", t->eng_req == ENGI_ACID && t->preset == 4u);
+    queued(0xB1, 0, 9, 1); pc(1, 2); frame();
+    bad += check("  a bank this firmware does not have (9): the PC is ignored", t->eng_req == ENGI_ACID && t->preset == 4u);
+    queued(0xB5, 0, ENGI_JPZ, 1); pc(5, 3); frame();
+    ok = !ui.mpc[1] && t->eng_req == ENGI_ACID && t->preset == 4u && !midi_ch[5].bank;
+    bad += check("  CH1-4: bank and program on channels 5..16 are ignored", ok);
+    /* USER: bank 8, the slot */
+    {
+        int16_t mark = (int16_t)(param_desc_of(ENGI_DRIFT, P_E0)->min + 1);
+        song.sel = 2; set_engine_of(TSEL, ENGI_DRIFT); TSEL->p[P_E0] = mark; up_store(4, "SYNTAKT");
+        song.sel = 0;
+        set_engine_of(&trk[2], 0);
+        queued(0xB2, 0, MIDI_BANK_USER, 1); pc(2, 4); frame();
+        ok = trk[2].eng_req == ENGI_DRIFT && trk[2].p[P_E0] == mark && user_of(&trk[2]) == 4u && TSEL == &trk[0];
+        ok &= !up_used(31);
+        queued(0xB2, 0, MIDI_BANK_USER, 1); pc(2, 31); frame();
+        ok &= user_of(&trk[2]) == 4u;
+        bad += check("  bank 8 USER: user preset n on that part (not the selected one); an empty slot ignored", ok);
+    }
+    /* PC IN OFF */
+    set_engine_of(&trk[3], 0);
+    menu_put(MI_PCIN, 1);
+    queued(0xB3, 0, ENGI_GWZ, 1); pc(3, 6); frame();
+    ok = trk[3].eng_req == 0 && trk[3].preset != 6u && !ui.mpc[3] && !ui.mbank[3];
+    menu_put(MI_PCIN, 0);
+    pc(3, 6); frame();
+    ok &= trk[3].eng_req == 0 && trk[3].preset == 6u;
+    bad += check("  PC IN OFF: bank and program ignored (and not kept for later); ON again: a PC loads", ok && str_eq(MI_NAME[MI_PCIN], "PC IN"));
+    /* CC 102..109 in */
+    midi_test_reset();
+    t = &trk[0];
+    ok = 1;
+    for (e = 0; e < NENGINES; e++) {
+        set_engine_of(t, e);
+        for (i = 0; i < 8u; i++) {
+            const param_desc_t *d = param_desc_of(e, P_E0 + i);
+            if (d->max <= d->min)
+                continue;
+            queued(0xB0, CC_E0 + i, 127, 1);
+            ok &= t->p[P_E0 + i] == d->max;
+            queued(0xB0, CC_E0 + i, 0, 1);
+            ok &= t->p[P_E0 + i] == d->min;
+        }
+    }
+    bad += check("  CC 102..109 set E0..E7 of the part on every machine, 0..127 over the range", ok);
+    /* .. and out: on CC 102..109, CUT also on CC74, a received one not sent back */
+    midi_test_reset();
+    usb.config = 1; mo_r = mo_w;
+    set_engine_of(t, ENGI_OBX);
+    t->p[P_MOUT] = MOUT_EXT;
+    events_block(CTL); mo_r = mo_w;
+    ok = 1;
+    for (i = 0; i < 8u; i++) {
+        const param_desc_t *d = param_desc_of(ENGI_OBX, P_E0 + i);
+        int32_t cc = param_cc(t, P_E0 + i), hit = 0;
+        if (d->max <= d->min)
+            continue;
+        t->p[P_E0 + i] = t->p[P_E0 + i] == d->max ? d->min : d->max;
+        events_block(CTL);
+        for (n = mo_r; n != mo_w; n++) {
+            uint32_t m = midi_out_q[n % MQ];
+            hit += ((m >> 8) & 0xF0u) == 0xB0u && ((m >> 16) & 0x7Fu) == (uint32_t)cc;
+        }
+        ok &= hit == 1 && mo_w - mo_r == 1u && cc >= 0;
+        ok &= mout_slot(t, P_E0 + i) >= (int32_t)MOUT_NMAP ? cc == (int32_t)(CC_E0 + i) : cc != (int32_t)(CC_E0 + i);
+        mo_r = mo_w;
+    }
+    queued(0xB0, CC_E0 + 3u, 99, 1); events_block(CTL);
+    ok &= mo_r == mo_w;
+    bad += check("  out: a change of E0..E7 goes out once, on CC 102..109 (an EDIT control's on its own CC); one received not sent back", ok);
+    /* a factory preset load: CC0 (the machine), then the Program Change */
+    set_engine_of(t, ENGI_CZZ); mo_r = mo_w;
+    song.sel = 0; apply_preset(5); events_block(CTL);
+    n = mo_w - mo_r;
+    ok = n >= 2u && midi_out_q[mo_r % MQ] == (0x0Bu | 0xB0u << 8 | 0u << 16 | (uint32_t)ENGI_CZZ << 24) &&
+         midi_out_q[(mo_r + 1u) % MQ] == (0x0Cu | 0xC0u << 8 | 5u << 16);
+    if (!ok) printf("    (%u out: %08x %08x)\n", n, midi_out_q[mo_r % MQ], midi_out_q[(mo_r + 1u) % MQ]);
+    bad += check("  a factory preset load sends CC0 = its machine, then its Program Change", ok);
+    t->p[P_MOUT] = MOUT_INT; mo_r = mo_w; usb.config = 0;
+    /* 300 CCs on TRS with notes held, faster than the ISR drains: no note lost, none left hanging, no panic */
+    midi_test_reset();
+    set_engine_of(t, 0);
+    midi_enqueue(0x09u | 0x90u << 8 | 60u << 16 | 100u << 24, 2u);
+    midi_enqueue(0x09u | 0x90u << 8 | 64u << 16 | 100u << 24, 2u);
+    for (i = 0; i < 300u; i++)
+        midi_enqueue(0x0Bu | 0xB0u << 8 | 74u << 16 | (i & 127u) << 24, 2u);
+    midi_enqueue(0x08u | 0x80u << 8 | 60u << 16, 2u);
+    ok = !midi_in_overflow && midi_in_shed == 300u + 2u - MIQ_SOFT;
+    events_block(CTL);
+    ok &= !gate_note(t, 60) && gate_note(t, 64) && !midi_in_overflow;
+    midi_enqueue(0x08u | 0x80u << 8 | 64u << 16, 2u); events_block(CTL);
+    ok &= !gate_note(t, 64) && !midi_owners[0];
+    if (!ok) printf("    (shed %u overflow %u)\n", midi_in_shed, midi_in_overflow);
+    bad += check("  a 300-CC TRS burst with notes held: CCs shed above 3/4, no note lost, none hanging, no panic", ok);
+    midi_in_shed = 0;
     return bad;
 }
 /* MENU > MIDI > MIDI IN (ROUT; up to 1.1.5 GLO > SYSTEM, #68): CH1-4 listens to channels 1..4 only, channels 5..16 are free for other instruments
@@ -1045,7 +1172,8 @@ static int test_mout(void)
 
     /* Program Change: a preset loaded on the FM-1 sends it, no CC burst; one loaded by a PC received sends nothing */
     apply_preset_to(t, 5); events_block(CTL);
-    ok = out_n() == 1 && out_pop() == (0x0Cu | 0xC2u << 8 | 5u << 16) && t->preset == 5;
+    ok = out_n() == 2 && out_pop() == (0x0Bu | 0xB2u << 8 | (uint32_t)(t->eng_req % NENGINES) << 24) &&   /* (V2: CC0 first) */
+         out_pop() == (0x0Cu | 0xC2u << 8 | 5u << 16) && t->preset == 5;
     events_block(CTL);
     ok &= out_n() == 0;
     pc(2, 7); frame(); events_block(CTL); events_block(CTL);
@@ -1161,6 +1289,7 @@ static int test_mout_review(void)
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + clock_arp_and_boundaries() +
-              arp_ext_stop_test() + usb_burst_test() + route_test() + route_block_test() + route_track_test() + follow_test() + cc_map_test() + test_cc_contract() + learn_test() + pc_test() + test_mout() + test_mout_review();
+              arp_ext_stop_test() + usb_burst_test() + route_test() + route_block_test() + route_track_test() + follow_test() + cc_map_test() + test_cc_contract() + learn_test() + pc_test() + test_mout() + test_mout_review() +
+              v2_midi_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
