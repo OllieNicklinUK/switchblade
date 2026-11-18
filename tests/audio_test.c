@@ -47,6 +47,7 @@ static void fresh(void)
     memset(&felucca_dbg, 0, sizeof felucca_dbg);
     audio_cpu_rem = audio_halves = audio_max_us = 0;
     shed_req = 0; shed_count = 0; shed_over = 0;
+    load_tight = 0; tight_calm = 0; tight_count = 0;
     host_clock = host_us = host_half_reads = host_dma_advanced = host_acks = host_nest = 0;
     host_pending = FM1_AUDIO_HALF;
     transport_req = panic_req = 0;
@@ -133,6 +134,72 @@ static void dma(void)
     for (i = 0; i < 512u; i++) fm1_alnk0_irq();
     expected = host_us * 256u / (HALF_FRAMES * 1000000u / FS);
     check("steady CPU load converges without integer smoothing bias", song.cpu_q8 >= expected - 1u && song.cpu_q8 <= expected);
+}
+/* V2 (Phase 0.6): the load budget (audio.c shed_check, voice.c load_tight, after Quantum GammaWave): on above 65 % of a
+ * half (the render alone), off after 16 halves in a row under 60 %; while on, the sound does not grow */
+static void load_budget(void)
+{
+    uint32_t dl = HALF_FRAMES * 1000000u / FS, i, n;
+    voice_t *tail, *a, *b;
+    int32_t out[2 * CTL];
+    fresh();
+    host_us = dl * 64u / 100u;
+    fm1_alnk0_irq();
+    check("load budget: a half at 64 % leaves it off", !load_tight);
+    host_us = dl * 66u / 100u;
+    fm1_alnk0_irq();
+    check("load budget: a half at 66 % turns it on (no overload fade: that is 80 %)", load_tight && tight_count == 1u && !shed_req);
+    host_us = dl * 62u / 100u;
+    for (i = 0; i < 40u; i++) fm1_alnk0_irq();
+    check("  60..65 %: it stays on", load_tight);
+    host_us = dl * 50u / 100u;
+    for (i = 0; i < 15u; i++) fm1_alnk0_irq();
+    host_us = dl * 61u / 100u; fm1_alnk0_irq();          /* (one at 61 %: the calm run starts again) */
+    host_us = dl * 50u / 100u;
+    for (i = 0; i < 15u; i++) fm1_alnk0_irq();
+    check("  15 calm halves after one at 61 %: still on", load_tight);
+    fm1_alnk0_irq();
+    check("  the 16th in a row under 60 %: off", !load_tight && tight_count == 1u);
+    fresh();
+    host_us = dl * 85u / 100u; host_nest = dl * 30u / 100u;   /* the render 55 %, TIMER5 nested 30 % */
+    fm1_alnk0_irq();
+    check("load budget: on the render alone (TIMER5 nested in it is not the sound's)", !load_tight);
+
+    /* POLY, tight: a new note takes a dying tail (here its own part's: restarted in place), the count stays */
+    fresh();
+    trk[0].p[P_VOICE] = V_POLY;
+    trk_note_on(&trk[0], 48, 100); trk_note_on(&trk[0], 52, 100); trk_note_on(&trk[0], 55, 100);
+    trk_note_off(&trk[0], 55);
+    tail = held(&trk[0], 55); tail->env = TAIL_QUIET / 4;
+    n = voices_busy();
+    load_tight = 1;
+    trk_note_on(&trk[0], 60, 100);
+    check("tight: a new POLY note takes the quiet tail, the sound does not grow",
+          voices_busy() == n && held(&trk[0], 60) && !held(&trk[0], 55) && held(&trk[0], 48)->gate && held(&trk[0], 52)->gate);
+    /* .. a loud release of another part, no quiet tail: that one goes (soft: never a held note) */
+    trk_note_on(&trk[1], 40, 100); trk_note_off(&trk[1], 40);
+    a = held(&trk[1], 40); a->env = 1 << 23;
+    n = voices_busy();
+    trk_note_on(&trk[0], 62, 100);
+    check("  no quiet tail: another part's released voice is given up instead",
+          a->stage == 4u && voices_busy() == n && held(&trk[0], 62) && held(&trk[0], 48)->gate);
+    mix_block(out, CTL);
+    n = voices_busy();
+    trk_note_on(&trk[0], 64, 100);
+    b = held(&trk[0], 64);
+    check("  nothing to give up but held notes: the note still plays (a held note is never cut for the budget)",
+          b && b->gate && voices_busy() == n + 1u && held(&trk[0], 48)->gate);
+    /* UNISON, tight: the lead only, no extra voices added */
+    fresh();
+    trk[2].p[P_VOICE] = V_UNISON;
+    load_tight = 1;
+    trk_note_on(&trk[2], 50, 100);
+    check("tight: UNISON plays its lead and adds no extra voices", trk[2].v[0].gate && voices_busy() == 1u);
+    load_tight = 0;
+    trk_note_off(&trk[2], 50); mix_block(out, CTL);
+    trk_note_on(&trk[2], 50, 100);
+    check("  not tight: UNISON as before", voices_busy() == trk_nvoice(&trk[2]));
+    load_tight = 0;
 }
 /* MENU > USB LEVEL (fx.c fx_usb_fixed, audio.c audio_block): MASTER (default) as before, USB = the DAC's signal and
  * follows the knob; FIXED: USB at the full level whatever MASTER is (MASTER 0: USB still plays, the DAC is silent),
@@ -265,7 +332,7 @@ int main(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     usb_level();
     boot_keys();
-    overload(); dma();
+    overload(); dma(); load_budget();
     printf(bad ? "audio: %d FAILED\n" : "audio: all passed\n", bad);
     return bad != 0;
 }

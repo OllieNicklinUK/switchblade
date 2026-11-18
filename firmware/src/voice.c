@@ -187,13 +187,48 @@ static voice_t *shed_pick(void)
     return best;
 }
 
+/* V2 (Phase 0.6), after Quantum GammaWave's load budget (JIANT 0.6.16, GPL-3.0-only): audio.c shed_check sets
+ * load_tight when a half's render took more than 65 % of its time, and clears it after 16 halves in a row under 60 %.
+ * While it is set the sound may not grow: a new voice takes the quietest dying release tail (quiet_tail: under
+ * -40 dB, weighted by the part's LEVEL) instead of adding one, else a released voice or another part's extra voice
+ * (voice_victim soft), never a held POLY note or a lead for it; an extra UNISON voice is not added. Ahead of the
+ * overload fade (80 %, audio.c) and of a late half (a click). The host never sets it (its ticks do not advance in
+ * the render): the goldens are the same */
+static volatile uint8_t load_tight;
+#define TAIL_QUIET ((1 << 24) / 100)                     /* -40 dB of v->env (Q24) */
+static uint32_t quiet_tail(track_t **pp)                 /* index of the quietest such tail, *pp its part; NVOICE none */
+{
+    uint32_t p, i, best = NVOICE, low = 0xFFFFFFFFu;
+    for (p = 0; p < NPART; p++)
+        for (i = 0; i < NVOICE; i++) {
+            const voice_t *v = &trk[p].v[i];
+            uint32_t e;
+            if (!v->active || v->gate || v->stage == 4u || v->env >= TAIL_QUIET)
+                continue;
+            e = (uint32_t)(v->env > 0 ? v->env : 0) / 256u * (uint32_t)(trk[p].p[P_LEVEL] + 1);
+            if (e < low) {
+                low = e;
+                best = i;
+                *pp = &trk[p];
+            }
+        }
+    return best;
+}
+
 /* the budget is full: free a voice for part t. 0 = nothing to take (soft) */
 static int voice_room(track_t *t, int soft)
 {
     track_t *vp = 0;
     uint32_t k;
-    if (voices_busy() < NVOICE)
+    if (voices_busy() < NVOICE) {
+        if (load_tight) {                               /* (the load budget: a dying tail makes the room) */
+            if ((k = quiet_tail(&vp)) < NVOICE)
+                voice_kill(&vp->v[k]);
+            else if (soft)
+                return 0;                               /* (no extra UNISON voice while the load is tight) */
+        }
         return 1;
+    }
     k = voice_victim(t, soft, &vp);
     if (k == NVOICE)
         return !soft;                                   /* hard: over the budget (cannot happen: each of the
@@ -226,9 +261,13 @@ static voice_t *voice_alloc(track_t *t, uint32_t note)
             return voice_reuse(t, &t->v[i]);
         nfree += !t->v[i].active;
     }
-    if (nfree && voices_busy() >= NVOICE) {
+    if (nfree && (voices_busy() >= NVOICE || load_tight)) {   /* (V2: the load budget too) */
         track_t *vp = 0;
-        uint32_t k = voice_victim(t, 0, &vp);
+        uint32_t k = NVOICE;
+        if (voices_busy() >= NVOICE)
+            k = voice_victim(t, 0, &vp);
+        else if ((k = quiet_tail(&vp)) == NVOICE)       /* tight: a dying tail, else a released / extra voice */
+            k = voice_victim(t, 1, &vp);
         if (k < np && vp == t)
             return &t->v[k];                            /* our own: restart it in place (no click) */
         if (k < NVOICE)

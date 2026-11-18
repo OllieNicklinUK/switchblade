@@ -69,3 +69,10 @@ Key figures (host instructions per sample, `-O2`, this machine):
 Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both parts, a floating bus, a shorted bus, reads that disagree, unknown parts, another density, BP bits and busy. Both chips use the same standard SPI NOR commands, so nothing else in the driver depends on the chip.
 
 **Not verified on a UCUN unit**: nobody here has one. The user's unit, the older chip, must keep saving as it does now; check that on the first device test.
+
+## Phase 0.5 and 0.6: MIDI and the load budget (2026-11-18)
+
+- Image 426,636 B (+1.5 KB on Phase 0.4); RAM .data+.bss 45,316 B of 73,728 (+1.8 KB: the 256-event MIDI IN ring).
+- 413 goldens unchanged. The host never turns the load budget on (its ticks do not advance inside the render), so it cannot change a golden; `tests/audio_test.c load_budget` drives it with simulated times.
+- `cpu/mix/worst8` (host, Linux counter): **3,863 instructions / sample**. `regress.c` picks it from each machine's dearest measured line, per voice, within each machine's cap, every part sounding, 8 voices in all. Today: JUNO DRIFT KEYS x3 on two parts, NANO BASSLINE x1 on two. It moves as the four new machines get their real voices (Phases 1-4), and it is the mix to PERF on the device with 0.2-beta's worst DIST mix (`cpu/DIST/worst_mix_on`).
+- `fm1_alnk0_irq` static count 31,155 (budget 30,886, +0.9 %).

@@ -238,7 +238,7 @@ static uint64_t now_ns, next_half, next_pkt;
 static uint32_t blocks_left;
 static uint64_t next_block, rend_len;
 static uint32_t lcg = 12345;
-/* render times: 7 % .. 85 % of a half (the overload shedding starts above 85 %) */
+/* render times: 7 % .. 85 % of a half (V2: the overload fade starts above 80 %, the load budget at 65 %: this test is about USB audio timing, not those) */
 #define REND_MIN ((uint64_t)(HALF_FRAMES * 1e9 / FS_DEV * 0.07))
 #define REND_MAX ((uint64_t)(HALF_FRAMES * 1e9 / FS_DEV * 0.85))
 

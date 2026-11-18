@@ -43,18 +43,38 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (fx.c), then Q15 
     }
 }
 
-/* Overload: two halves in a row above 85 % (the render plus TIMER5 nested in it), fade one voice over the
- * next block, and one more each half while it lasts. Keep each part's
+/* Overload: two halves in a row above 80 % (V2, as Quantum GammaWave 0.6.15: was 85, too late) (the render plus
+ * TIMER5 nested in it), fade one voice over the next block, and one more each half while it lasts. Keep each part's
  * lowest POLY note and MONO / LEGATO / UNISON lead, as the shared budget does. */
 static volatile uint8_t shed_req;
-static uint8_t shed_over;                              /* bit k: the half k halves ago was over 85 % */
-#define SHED_TICKS ((HALF_FRAMES * 1000000u / FS) * 85u / 100u * FM1_TICKS_PER_US)   /* 85 % of a half */
+static uint8_t shed_over;                              /* bit k: the half k halves ago was over 80 % */
+#define SHED_TICKS ((HALF_FRAMES * 1000000u / FS) * 80u / 100u * FM1_TICKS_PER_US)   /* 80 % of a half */
 static uint32_t shed_count;
+/* V2 (Phase 0.6, after QG 0.6.16 / 0.6.17 / 0.6.19): the load budget (voice.c load_tight), on the render alone (a key
+ * scan or USB burst nested in it is not the sound's): on above 65 % of a half, off after 16 halves in a row under 60 % */
+#define TIGHT_ON ((HALF_FRAMES * 1000000u / FS) * 65u / 100u * FM1_TICKS_PER_US)
+#define TIGHT_OFF ((HALF_FRAMES * 1000000u / FS) * 60u / 100u * FM1_TICKS_PER_US)
+#define TIGHT_CALM 16u
+static uint8_t tight_calm;                             /* halves in a row under 60 % while tight */
+static uint32_t tight_count;                           /* times the load budget came on (a count, the console) */
 
 /* end of a half: all = its ticks, TIMER5 nested in it included -> the render alone in us. The deadline sees
  * both; shed after 2 overloaded halves in a row (out of line: keeps the ISR's render loops as they were) */
 static __attribute__((noinline)) uint32_t shed_check(uint32_t all)
 {
+    uint32_t r = all - t5_nested_ticks;
+    if (r > TIGHT_ON) {
+        tight_count += !load_tight;
+        load_tight = 1;
+        tight_calm = 0;
+    } else if (load_tight) {
+        if (r >= TIGHT_OFF)
+            tight_calm = 0;                            /* (60..65 %: still tight, the calm run starts again) */
+        else if (++tight_calm >= TIGHT_CALM) {
+            load_tight = 0;
+            tight_calm = 0;
+        }
+    }
     shed_over = (uint8_t)(shed_over << 1 | (all > SHED_TICKS));
     if ((shed_over & 3u) == 3u)
         shed_req = 1;

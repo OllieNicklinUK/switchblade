@@ -1098,6 +1098,80 @@ int main(int argc, char **argv)
     }
     c1 = nj;
     run_jobs(J + c0, c1 - c0, 1);
+    {   /* V2 (Phase 0.6, plan §3.4): cpu/mix/worst8, the 8 dearest voices the rules allow. Each machine's dearest measured
+         * line (its heaviest preset, DRIFT's chorus lines too) gives a cost per voice: its count less idle's, over the
+         * voices it sounded (8 notes asked, the machine's own cap). Every machine on every part (the same one twice
+         * too), each part sounding at least one voice (its fixed costs: DIST, the part chorus, its sends), 8 in all,
+         * none over its cap: the dearest such mix by those costs is then rendered for real. It pins the figure; it
+         * claims no device percentage (the device PERF of Phase 7 converts) */
+        static uint8_t w8[NPART][3];
+        double vc[NENGINES] = {0}, bestc = -1, idle = J[c1 - 4u].r.ipc ? J[c1 - 4u].r.ipc : J[c1 - 4u].r.ns;
+        uint32_t cap[NENGINES] = {0}, hj[NENGINES] = {0}, combo, q, best_combo = 0, bn[NPART] = {0};
+        for (q = c0; q < c1; q++) {
+            const job_t *jq = &J[q];
+            double c = jq->r.ipc ? jq->r.ipc : jq->r.ns;
+            if (jq->e >= NENGINES || jq->crashed)
+                continue;
+            host_tracks_init();
+            host_preset(&trk[0], jq->e, jq->pi);
+            trk[0].p[P_VOICE] = V_POLY;
+            {
+                uint32_t nv = trk_nvoice(&trk[0]) < 8u ? trk_nvoice(&trk[0]) : 8u;
+                double per = (c - idle) / (nv ? nv : 1u);
+                if (!hj[jq->e] || per > vc[jq->e]) {
+                    vc[jq->e] = per;
+                    cap[jq->e] = nv;
+                    hj[jq->e] = q;
+                }
+            }
+        }
+        for (combo = 0; combo < NENGINES * NENGINES * NENGINES * NENGINES; combo++) {
+            uint32_t m[NPART], n[NPART], left = NVOICE - NPART, p, ok = 1;
+            double c = 0;
+            for (p = 0, q = combo; p < NPART; p++, q /= NENGINES) {
+                m[p] = q % NENGINES;
+                n[p] = 1;
+                ok &= hj[m[p]] && cap[m[p]] >= 1u;
+            }
+            if (!ok)
+                continue;
+            while (left) {                              /* the rest to the dearest voice with room */
+                uint32_t bp = NPART;
+                for (p = 0; p < NPART; p++)
+                    if (n[p] < cap[m[p]] && (bp == NPART || vc[m[p]] > vc[m[bp]]))
+                        bp = p;
+                if (bp == NPART)
+                    break;
+                n[bp]++;
+                left--;
+            }
+            for (p = 0; p < NPART; p++)
+                c += n[p] * vc[m[p]];
+            if (c > bestc) {
+                bestc = c;
+                best_combo = combo;
+                memcpy(bn, n, sizeof bn);
+            }
+        }
+        {
+            job_t *j = add(J_CPU, "cpu/mix/worst8");
+            uint32_t p;
+            j->e = 0xFF;
+            for (p = 0, q = best_combo; p < NPART; p++, q /= NENGINES) {
+                uint32_t me = q % NENGINES;
+                w8[p][0] = (uint8_t)me;
+                w8[p][1] = J[hj[me]].pi;
+                w8[p][2] = (uint8_t)bn[p];
+                if (me == ENGI_DRIFT)
+                    j->chor = J[hj[me]].chor;           /* (DRIFT's dearest line: its chorus as there) */
+                printf("regress: worst8: part %u %-6s %-14s x%u (%.0f a voice)\n", p + 1u, ENGINES[me]->name,
+                       ENGINES[me]->presets[w8[p][1]].name, bn[p], vc[me]);
+            }
+            j->parts = (const uint8_t (*)[3])w8;
+            run_jobs(j, 1, 1);
+        }
+        c1 = nj;
+    }
 
     /* ---- report: goldens and health ---- */
     ng = load_kv(gpath, gold, MAXJ);
@@ -1188,8 +1262,8 @@ int main(int argc, char **argv)
     /* a preset's own cost: its count less the idle mix's (the mix alone is half of a light preset's),
      * so +25 % means 25 % more engine work; the mixes as they are */
     nc = load_kv(cpath, cpu, MAXJ);
-    idle_now = J[c1 - 4u].r.ipc;
-    idle_base = kv_get(cpu, nc, J[c1 - 4u].name) ? atof(kv_get(cpu, nc, J[c1 - 4u].name)) : 0;
+    idle_now = J[c1 - 5u].r.ipc;
+    idle_base = kv_get(cpu, nc, J[c1 - 5u].name) ? atof(kv_get(cpu, nc, J[c1 - 5u].name)) : 0;
     for (i = c0; i < c1; i++) {
         const job_t *j = &J[i];
         const char *want = kv_get(cpu, nc, j->name);
@@ -1240,7 +1314,7 @@ int main(int argc, char **argv)
         if (eng_ok(e))
             printf("regress:   %-8s %-14s %6.0f instr  %6.1f ns\n", ENGINES[e]->name, ENGINES[e]->presets[heavy_p[e]].name,
                    heavy[e], heavy_ns[e]);
-    for (i = c1 - 4u; i < c1; i++)
+    for (i = c1 - 5u; i < c1; i++)
         printf("regress:   %-23s %6.0f instr  %6.1f ns\n", J[i].name + 8, J[i].r.ipc, J[i].r.ns);
 
     printf("regress: %u golden renders (%u changed, %u gone), %u health failures, %u voice / routing checks failed, "
