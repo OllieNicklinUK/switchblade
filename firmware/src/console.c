@@ -201,7 +201,9 @@ static void con_status(void)
     con_kv("audio_late", (int32_t)felucca_dbg.late);
     con_kv("voices_shed", (int32_t)shed_count);
     con_kv("voices_given_up", (int32_t)voice_kills);
-    con_kv("track", (int32_t)song.sel + 1);
+    con_kv("load_tight", (int32_t)load_tight);          /* V2: the load budget on now (audio.c, voice.c) */
+    con_kv("load_tight_count", (int32_t)tight_count);   /* .. the times it came on */
+    con_kv("midi_in_shed", (int32_t)midi_in_shed);      /* V2: CC / AT / bend dropped above 3/4 of the MIDI IN ring (usb.c) */    con_kv("track", (int32_t)song.sel + 1);
     con_kv("batt_raw", song.batt_raw);
     con_puts("engine ");
     con_puts(e->name);
