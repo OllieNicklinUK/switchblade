@@ -14,6 +14,7 @@
  *   (e) DECY 0 against 127: the filter envelope's time constant differs by >= 5 x (the audio's, and the engine's own);
  *   (f) the cost of a voice, against OB-Z and against the 4600 instruction / sample bound;
  *   (g) amp() stays in [0, 32767] whatever the settings; done() ends a released voice and a held one; the state fits. */
+#include "host_pins.h"   /* (V2) per-host cost pins */
 #include <stdint.h>
 #include <stdarg.h>
 static int imp_mode, imp_pending;                  /* the B3_IN seam: the oscillator off, one impulse on request; mode 2 a square (test_wet_bus) */
@@ -703,12 +704,15 @@ static void test_slots(void)
 }
 
 /* ------------------------------------------------------------------ (f) --- */
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }
@@ -771,7 +775,7 @@ static double mix_cost(void)                       /* instructions / sample over
  * brief's first bound (4600, three times OB-Z's 1524 of the old baseline) was a tripwire at 3.5 x: it passed -DBASS303_OS=4 (1171)
  * and -DBASS303_CTRL=1 (1113). 1080 fails both (and OS 4 + CTRL 1: 1310). A host-instruction count: a different compiler or
  * -O level moves it, so on such a change re-measure and move the bound with a stated reason (never to hide a regression). */
-#define ACID_COST_MAX 1080.0
+#define ACID_COST_MAX HOST_PIN(1080.0, 1196.0)   /* (V2) Linux x86-64: 1087 measured + 10 % */
 
 static void test_cost(void)
 {

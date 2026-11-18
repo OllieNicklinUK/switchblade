@@ -568,7 +568,14 @@ static void persist_boot(void)                    /* before settings_init / pane
 #if FELUCCA_FLASH
     persist_t p;
     uint32_t f = irq_save();
-    flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;       /* the expected 1 MiB part, else stay RAM-only */
+    {   /* V2: either documented 1 MiB part (newer FM-1s ship the UCUN 0xB36014), two agreeing reads, the status
+         * register idle and unprotected (hal/fm1_flash_id.h, after Quantum GammaWave); else stay RAM-only */
+        fl_id_t r;
+        r.id_a = FL_FAR(fl_jedec_ram)();
+        r.id_b = FL_FAR(fl_jedec_ram)();
+        r.sr = FL_FAR(fl_status_ram)();
+        flash_ok = fl_id_verify(&r) == FL_ID_OK;
+    }
     irq_restore(f);
     if (!flash_ok)
         return;

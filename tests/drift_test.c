@@ -22,6 +22,7 @@
  *   (n) the two 1.59 Hz DC blockers: -6 dB at 1.59 Hz; (o) a new note on a finished voice starts clean, a retrigger keeps the states;
  * plus the halfband pair (gain, image rejection) and a bounded / finite sweep of the corners.
  * The DRIFT_IN seam (eng_drift.c) replaces the oscillator by silence, an impulse, a sine or noise, to measure the filter alone. */
+#include "host_pins.h"   /* (V2) per-host cost pins */
 #include <stdint.h>
 #include <stdarg.h>
 #include <math.h>
@@ -1151,12 +1152,15 @@ static void test_ftype_fallback(void)
 }
 
 /* ------------------------------------------------------------ (i) --- */
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }
@@ -1385,7 +1389,7 @@ static void test_cost(void)
  * firmware's loop, pinned at +10 % of its measured cost, -O2 (host instructions a sample, the units of (i)): 240 before Task 6.3 (the exact tick, not
  * inlined, the whole state written back), 156 with the small-signal path, always_inline and the short write-back. The exact tick it replaced (ref_tick in
  * registers) is printed for comparison; how a compiler lays that one out is not asserted. */
-#define LADDER_COST_MAX 172.0   /* the measured va_ladder_run (156 at -O2, DRIFT_OS 1) + 10 % */
+#define LADDER_COST_MAX HOST_PIN(172.0, 198.0)   /* the measured va_ladder_run (156 at -O2 on the Mac, 180 on Linux x86-64; DRIFT_OS 1) + 10 % */
 static double ladder_cost(int exact)
 {
     static float x[32], y[32];

@@ -15,6 +15,7 @@
  * harmonic density of a sine) rising monotonically with the knob. */
 
 #define AUDITION_NO_MAIN
+#include "host_pins.h"   /* (V2) per-host cost pins */
 #include <stdarg.h>
 #include "audition.c"
 #include "dspfft.h"
@@ -35,12 +36,15 @@ static void check(int ok, const char *fmt, ...)
     bad += !ok;
 }
 
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }
@@ -70,7 +74,7 @@ static void old_dist(old_st_t *t, int32_t d, int32_t *b, uint32_t n)
 /* the drive's own figures (2026-10-21, measured, pinned): the alias floor of test 7b (dB, 110 / 440 Hz x P_DIST 51 / 76 / 102 / 127),
  * the cost (host instructions a sample, +10 %), the state after the part's tail (FS) */
 static const double ALIAS_PIN[2][4] = {{-32.4, -33.1, -34.3, -35.2}, {-26.9, -27.3, -28.3, -29.1}};
-#define DIST_COST_MAX 52.0       /* measured 46.6 (the Scream loop: 370) */
+#define DIST_COST_MAX HOST_PIN(52.0, 70.0)   /* measured 46.6 on the Mac, 63.8 on Linux x86-64 (the Scream loop: 370) */
 #define DIST_MIX_MAX 155.0       /* measured +140 (the Scream loop: +1117) */
 #define DIST_TAIL_FS 0.001       /* measured 0: the state settles exactly */
 static track_t T;                                 /* the track the DIST is run on (state: dst, dist_hp) */

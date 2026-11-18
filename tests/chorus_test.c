@@ -13,6 +13,7 @@
  * Through the mix (hostsim's mix_block, the real fx.c hook): OFF bit for bit as before (pinned hashes of today's output), other engines
  * ignore the parameter, ON is stereo, PAN / SPREAD, the worst case inside the integer mixer's limits (task-7.2a-review: x <= 524,287 per
  * track, the four-track sum < 2^21), the parameter's descriptor and its legacy value, the cost. */
+#include "host_pins.h"   /* (V2) per-host cost pins */
 #include <stdint.h>
 #include <stdarg.h>
 #include <math.h>
@@ -719,19 +720,22 @@ static void test_wet_bus(void)
 }
 
 /* ------------------------------------------------------------ the cost --- */
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }
 /* The pin: chorus_part per sample per part (the int32 block in, mid / side out), the whole stage, in regress.c's units (kernel-counted instructions
  * on the Mac, cc -O2); +10 % of the measured worst of the three modes. Another compiler or -O level moves it: re-measure and say why, never to hide a
  * regression. The device's cost is what Task 8.1's PERF run measures. */
-#define CHORUS_COST_MAX 111.0   /* the measured worst (I, 101: the Juno-60 module, 2026-10-21; the KR-106 port was 182) + 10 %, -O2, cc on the Mac */
+#define CHORUS_COST_MAX HOST_PIN(111.0, 185.0)   /* (V2: Linux x86-64 measured 168 + 10 %) */   /* the measured worst (I, 101: the Juno-60 module, 2026-10-21; the KR-106 port was 182) + 10 %, -O2, cc on the Mac */
 static void test_cost(void)
 {
     enum { NB = 4096 };

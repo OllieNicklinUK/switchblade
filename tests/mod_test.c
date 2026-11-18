@@ -437,12 +437,15 @@ static void test_midi(void)
     check("MODW -> PAN +63 through MIDI: the part is on the right (fresh FX)", in_child(pan_e2e));
 }
 /* ------------------------------------------------------------------ 4 --- */
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }

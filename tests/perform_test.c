@@ -40,6 +40,7 @@
  * Demos (WAV) into DEMO_DIR; with a third directory 1.5.1's throws (the loop dry, ECHO THROW at 1/8D, REV THROW); with a second directory, the harmonizer's (a melody with OCT UP, OCT DN, and
  * OCT UP with the shimmer) and FLANGER's and PHASER's (a loop plain, then with each) into it. */
 #define main hostsim_main
+#include "host_pins.h"   /* (V2) per-host cost pins */
 #include "hostsim.c"
 #undef main
 #ifdef __APPLE__
@@ -1373,12 +1374,15 @@ static int test_throw(void)
 }
 
 /* -------------------------------------------------------------- 8. cost --- */
+#include "instr_linux.h"   /* (V2) the Linux instruction counter */
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#elif defined(__linux__)
+    return instr_linux();   /* (V2) tests/instr_linux.h */
 #endif
     return 0;
 }
@@ -1438,10 +1442,10 @@ static int test_cost(void)
     /* 2.5, not 2.2 since FM1-Four Task 4.1: the harmonizer costs exactly what it did (+256 over the
      * idle song plain, +291 with the shimmer, both unchanged), but OB-Z lost its noise and drive, so
      * the REPEAT 1/16 run it is measured against fell from +164 to +152 over idle. */
-    bad += check(what, (harm - rep) * 0.017 <= 2.5);
+    bad += check(what, (harm - rep) <= HOST_PIN(2.5 / 0.017, 189.0));   /* (V2) Linux x86-64: +172 measured + 10 % (the 0.017 device factor is the Mac's) */
     snprintf(what, sizeof what, "  FLANGER over REPEAT 1/16: +%.0f, PHASER +%.0f (device ~%.1f / %.1f %%, at most 2.5 %% each)",
              flg - rep, phs - rep, (flg - rep) * 0.017, (phs - rep) * 0.017);
-    bad += check(what, (flg - rep) * 0.017 <= 2.5 && (phs - rep) * 0.017 <= 2.5);
+    bad += check(what, (flg - rep) <= HOST_PIN(2.5 / 0.017, 232.0) && (phs - rep) <= HOST_PIN(2.5 / 0.017, 260.0));   /* (V2) Linux: +211 / +236 + 10 % */
     snprintf(what, sizeof what, "  REV THROW + ECHO THROW over idle: +%.0f, over REPEAT 1/16 +%.0f (device ~%.1f %%, at most 2 %%)",
              thr - idle, thr - rep, (thr - rep) * 0.017);
     return bad + check(what, (thr - rep) * 0.017 <= 2.0);

@@ -185,6 +185,8 @@ run() { echo "== $1"; shift; "$@" || fail=1; }
 
 $CC -o "$OUT/storage_test" tests/storage_test.c
 run "flash storage (A/B, torn writes)" "$OUT/storage_test"
+$CC -o "$OUT/flash_id_test" tests/flash_id_test.c
+run "flash identification: both documented FM-1 parts, two agreeing reads, 1 MiB, protection -> RAM-only" "$OUT/flash_id_test"
 
 $CC -o "$OUT/upreset_test" tests/upreset_test.c
 run "user presets (UP_PUT parser, bank round trip, versions, retired grid records and engines read as empty)" "$OUT/upreset_test"
