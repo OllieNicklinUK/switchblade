@@ -20,10 +20,10 @@
 #define ENGI_WAVE 1u             /* WAVE (eng_wave.c, the VOID WAVE plugin's voice) */
 #define ENGI_ACID 2u             /* ACID (eng_acid.c) */
 #define ENGI_DRIFT 3u            /* DRIFT (eng_drift.c) */
-#define ENGI_JPZ 4u              /* V2: JP-Z, the JP-8000 Super Saw (eng_stub.c until Phase 3) */
-#define ENGI_CZZ 5u              /* V2: CZ-Z, Casio phase distortion (eng_stub.c until Phase 1) */
-#define ENGI_GWZ 6u              /* V2: GW-Z, ORGAN / VOX / ADD (eng_stub.c until Phase 2) */
-#define ENGI_MICRO 7u            /* V2: MICRO, the Waldorf Microwave I (eng_stub.c until Phase 4) */
+#define ENGI_JPZ 4u              /* V2: JP-Z, the JP-8000 Super Saw (eng_jpz.c) */
+#define ENGI_CZZ 5u              /* V2: CZ-Z, Casio phase distortion (eng_cz.c) */
+#define ENGI_GWZ 6u              /* V2: GW-Z, ORGAN / VOX / ADD (eng_gwz.c) */
+#define ENGI_MICRO 7u            /* V2: MICRO, the Waldorf Microwave I (eng_micro.c) */
 #define UP_SLOTS 32u             /* user presets (upreset.c) */
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
 

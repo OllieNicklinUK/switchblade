@@ -34,7 +34,7 @@ static inline void *eng_mem_of(uint32_t p);
 #include "eng_cz.c"             /* CZ-Z (V2 Phase 1): the uPD933 voice, after MAME's upd933.cpp (Devin Acker, BSD-3-Clause) */
 #include "eng_jpz.c"            /* JP-Z (V2 Phase 3): the JP-8000's Super Saw, after the ESP2 microcode analysis */
 #include "eng_gwz.c"            /* GW-Z (V2 Phase 2): ORGAN / VOX / ADD, Quantum GammaWave's WHEEL, VOICE and ADDTV */
-#include "eng_stub.c"           /* V2: MICRO on a placeholder voice until Phase 4 */
+#include "eng_micro.c"          /* MICRO (V2 Phase 4): after the Waldorf Microwave I, stepped 8-bit wavetables of our own */
 ENG_MEM_FITS("DRIFT", DRIFT_MEM);
 ENG_MEM_FITS("JPZ", JPZ_MEM);
 ENG_MEM_FITS("GWZ", GW_MEM);

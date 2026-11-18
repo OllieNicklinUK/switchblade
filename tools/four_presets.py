@@ -42,7 +42,7 @@ RANGES = {                                                       # edit[0..7] mi
     "JPZ": [PCT, PCT, (-64, 63), (-24, 24), PCT, PCT, PCT, PCT],      # eng_stub.c ENG_JPZ (DTN MIX BAL OSC2 CUT RES KTR WID)
     "CZZ": [(0, 7), (0, 7), (0, 3), PCT, PCT, PCT, (0, 2), PCT],   # eng_cz.c ENG_CZZ (WAV1 WAV2 LINE DTN CUT KEYF MOD DCWE)
     "GWZ": [PCT] * 8,                                              # eng_gwz.c ENG_GWZ: every slot 0..127 on its three models
-    "MICRO": [(0, 31), PCT, (-64, 63)] + [PCT] * 5,                 # ENG_MICRO (WT POS EPOS OSC2 CUT RES GRIT KTR)
+    "MICRO": [(0, 15), PCT, (-64, 63)] + [PCT] * 5,                 # eng_micro.c ENG_MICRO (WT POS EPOS OSC2 CUT RES GRIT KTR)
 }
 WAVE_PX = dict(ftype=(0, 6), voice=(0, 3), detune=(0, 128), spread=PCT, glide=PCT, ldflt=(-64, 63), lsync=(0, 10))
 NANO_MODEL = (0, 1)                                              # NANO's model: 0 the 303, 1 SUB (eng_sub.c); the ACID category is the 303's

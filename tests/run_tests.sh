@@ -392,6 +392,8 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "JP-Z: the Super Saw's detune law and mix, free phases and their seeding, the filter, KTR, BAL, WID, UNISON, every preset sounds" "$OUT/jpz_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/gwz_test" tests/gwz_test.c -lm
     run "GW-Z: ORGAN / VOX / ADD by preset, descriptors, bars, percussion, rotor, the tone filter, vowels, partials and decay" "$OUT/gwz_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/micro_test" tests/micro_test.c -lm
+    run "MICRO: the tables, 64 stepped waves (no crossfade), WT, OSC2, GRIT, the EPOS sweep, the filter, KTR, RES stability" "$OUT/micro_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
     run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/union_test" tests/union_test.c -lm

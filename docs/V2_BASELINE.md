@@ -103,3 +103,10 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - `firmware/src/eng_gwz.c`: Quantum GammaWave's WHEEL / VOICE / ADDTV as GW-Z's ORGAN / VOX / ADD models, by preset; every slot 0..127; ORGAN with a tone filter and a continuous ROTR speed; `engine_t.block` added (voice.c track_render). Engine memory: the model's per-part state and 8 voices.
 - Image 443,488 B (+8.1 KB). Host CPU: GW-Z presets up to 2,453 instructions / sample for 8 voices (VOX 4), ~250 a voice; `worst8` unchanged (3,865). Static: `gw_render` 901 (4 divides: VOX's per-block coefficient work), `gw_block` 80.
 - Goldens: the 50 GW-Z lines replaced, the others unchanged; `union_test`: only the GW-Z (6) switch lines re-recorded. Preset audit: GW-Z median -14.5 dBFS (on the library's -14.1), spread 21.8 dB.
+
+## Phase 4: MICRO (2026-11-18) — all eight machines voiced
+
+- `firmware/src/eng_micro.c`: two stepped 8-bit wavetable oscillators (16 own PPG-style tables, 64 waves each, no crossfade, no sample interpolation), EPOS sweep, OSC2 detune, GRIT (bits + hold), a 24 dB TPT SVF pair with KTR, a DC blocker. `eng_stub.c` removed.
+- Image 460,836 B (+17 KB, 16 KB of it the tables; ~120 KB of the app area left). RAM unchanged (45,316 B).
+- Host CPU per voice (heaviest preset, 8 voices, less idle): JUNO ~400 (cap 3), NANO ~510 (cap 1), GW-Z ~250, JP-Z ~240, CZ-Z ~190, MICRO ~180. `worst8` unchanged at 3,861 (JUNO + NANO). Static: `micro_render` 169, no divides.
+- Preset audit, all 400 pass: level medians OB-Z -12.3, WAVE -14.3, NANO -15.2, JUNO -11.8, JP-Z -10.9, CZ-Z -16.9, GW-Z -14.5, MICRO -15.1 dBFS; 72 exact duplicates left, all the SLOT 33..50 placeholders of the four 0.2 machines.
