@@ -1,12 +1,14 @@
-# V2 device test (build v0.3-v2test2; test1 also works with this sheet)
+# V2 device test (build v0.3-v2test3; test1 and test2 also work with this sheet)
 
 The first V2 build on a real FM-1. It checks that saving still works on your unit, measures the CPU on the device for
 the first time, and tries the new MIDI. About 30–40 minutes. Note what you see against each step; anything odd is
 worth writing down, even if you are not sure it is a fault.
 
-**The build (use this one):** `build/release-0.3-v2test2/switchblade-0.3-v2test2.fwsc`, identity `FM-1_9403`, version
-`v0.3-v2test2`, SHA-256 `9229d1c7…2ccf0470` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
-have their own voices**. Its installer site is `build\v2test2-site` (use it in place of `v2test-site` in step 1).
+**The build (use this one):** `build/release-0.3-v2test3/switchblade-0.3-v2test3.fwsc`, identity `FM-1_9403`, version
+`v0.3-v2test3`, SHA-256 `669f478d…0ffcf177` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
+have their own voices**. Its installer site is `build\v2test3-site`.
+(test3 is test2 with JP-Z's crackle fixed: its mix ran 8x hot, so the saws in phase clipped its filter and wrapped its
+voice gain. test2, `v0.3-v2test2`, `build\v2test2-site`, has that crackle.)
 (test1, `v0.3-v2test1`, `build\v2test-site`: Phases 0 and 1 only, JP-Z, GW-Z and MICRO a placeholder saw.)
 
 **What it is not yet:** presets 33–50 of the four old machines are copies named SLOT 33..50, and the new machines'
@@ -33,7 +35,7 @@ machine knob sweeps the wavetable, GRIT on page 2. For CPU (section 4), add mix 
 The command-line installer needs `python-rtmidi`, which is not on this PC, so use the web installer from a local copy:
 
 ```
-cd D:\Switchblade\FM1-Four\build\v2test2-site
+cd D:\Switchblade\FM1-Four\build\v2test3-site
 py -3 -m http.server 8000
 ```
 
@@ -42,7 +44,7 @@ editor tab and any DAW using the FM-1's MIDI port first. Leave the server window
 
 ## 2. Saving (the most important check)
 
-- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test2**.
+- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test3**.
 - [ ] Your 0.2-beta projects and user presets are still there, and load and sound as before.
 - [ ] Change a MENU setting, save a **project** and a **user preset**, switch the FM-1 off and on: all three kept.
 - [ ] Optional: the USB serial console's `status` shows `flash 1` (saving allowed).
