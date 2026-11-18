@@ -42,3 +42,7 @@ PRESETS = [
     dict(name='TITANIUM', cat='KEYS', e=[0, 10, 127, 50, 72, 55, 40, 0], env=[0, 46, 0, 42], fenv=28, mono=0, fx=(0, 15, 25, 35), pat=6, model=1, ftype=3, mono1=0, glide=0, fa=0, fd=38, fs=15, fr=38, ktrk=60, o1=127, w2=127, semi=96, pwm=0, vel=70, lrate=40, lpit=0, lcut=0, vol=100),   # Titanium (Synth)
     dict(name='VANADIUM', cat='KEYS', e=[1, 8, 90, 30, 58, 60, 64, 0], env=[0, 34, 0, 30], fenv=34, mono=0, fx=(0, 15, 25, 35), pat=6, model=1, ftype=0, mono1=0, glide=0, fa=0, fd=30, fs=0, fr=28, ktrk=70, o1=127, w2=0, semi=64, pwm=40, vel=80, lrate=30, lpit=0, lcut=0, vol=110),   # Vanadium (Synth)
 ]
+
+# V2 Phase 0.4: presets 32..49 are placeholders (copies of 0..17, named SLOT 33..50) until Phase 5 voices them;
+# 0..31 above keep their numbers (saved projects and Program Changes load the same sound)
+PRESETS += placeholder(PRESETS[:18], 32)

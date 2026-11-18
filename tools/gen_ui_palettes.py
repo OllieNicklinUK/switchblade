@@ -41,6 +41,11 @@ MACHINE_PALETTES = [
     ("ACID",  (208, 218, 225), (188, 202, 213), (18, 24, 32),    (37, 38, 45),     (138, 54, 0)),
     # DRIFT's keycaps are tan, as the Juno-106's buttons (the 6th colour: a keycap fill of its own, not derived)
     ("DRIFT", (11, 13, 17),    (24, 27, 34),    (228, 230, 232), (255, 96, 90),   (61, 134, 200), (224, 197, 144)),
+    # V2 placeholders (the UI phase samples the real panels): dark, each with its theme colour
+    ("JP-Z",  (12, 14, 20),    (30, 34, 44),    (230, 232, 236), (80, 170, 255),  (255, 140, 60)),
+    ("CZ-Z",  (13, 13, 16),    (24, 24, 29),    (236, 236, 236), (255, 104, 98),  (96, 156, 236)),
+    ("GW-Z",  (16, 12, 10),    (30, 24, 20),    (240, 228, 210), (230, 170, 80),  (246, 128, 88)),
+    ("MICRO", (8, 12, 18),     (22, 32, 44),    (226, 236, 242), (70, 200, 220),  (240, 200, 80)),
 ]
 PAL_TAG = 64                       # stored id = PAL_TAG + 10 (MACHINE's id in the earlier firmware's palette list)
 PAL_STORED_MACHINE = 10

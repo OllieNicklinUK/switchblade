@@ -40,3 +40,7 @@ PRESETS = [
     dict(name="SOFT BELL", cat="KEYS", e=[3, 25, 100, 64, 100, 10, 0, 0], env=[0, 100, 0, 95], fenv=10, mono=0, fx=(0, 30, 45, 70), pat=7),
     dict(name="WURLY", cat="KEYS", e=[2, 8, 70, 64, 66, 10, 0, 0], env=[1, 85, 40, 60], fenv=24, mono=0, fx=(5, 55, 20, 35), pat=6),
 ]
+
+# V2 Phase 0.4: presets 32..49 are placeholders (copies of 0..17, named SLOT 33..50) until Phase 5 voices them;
+# 0..31 above keep their numbers (saved projects and Program Changes load the same sound)
+PRESETS += placeholder(PRESETS[:18], 32)

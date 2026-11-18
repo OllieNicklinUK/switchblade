@@ -45,8 +45,10 @@ int main(int argc, char **argv)
     /* Switch Blade has one colour scheme: the four machines' palettes (UI_MACHINE_PALS, engine order; the fixed palettes and
      * CUSTOM are gone). Each one: the contrast of text, labels, values, selection and keycaps (DRIFT's tan keys), the light
      * ACID's derived tokens, the trim, the alpha blend (no halo), the sheet */
-    assert(NPALETTES == 4u && UI_NMACHINE == 4u && !strcmp(UI_MACHINE_PALS[0].name, "OB-Z") && !strcmp(UI_MACHINE_PALS[1].name, "WAVE") &&
-           !strcmp(UI_MACHINE_PALS[2].name, "ACID") && !strcmp(UI_MACHINE_PALS[3].name, "DRIFT"));
+    assert(NPALETTES == 8u && UI_NMACHINE == 8u && !strcmp(UI_MACHINE_PALS[0].name, "OB-Z") && !strcmp(UI_MACHINE_PALS[1].name, "WAVE") &&
+           !strcmp(UI_MACHINE_PALS[2].name, "ACID") && !strcmp(UI_MACHINE_PALS[3].name, "DRIFT") &&   /* (V2: + the four new, engine order) */
+           !strcmp(UI_MACHINE_PALS[4].name, "JP-Z") && !strcmp(UI_MACHINE_PALS[5].name, "CZ-Z") &&
+           !strcmp(UI_MACHINE_PALS[6].name, "GW-Z") && !strcmp(UI_MACHINE_PALS[7].name, "MICRO"));
     for (unsigned st = ST_FLAT; st <= ST_LINE; st++) {
         ux.style = (uint8_t)st;
         for (unsigned m = 0; m < UI_NMACHINE; m++) {

@@ -56,7 +56,7 @@ int main(void)
                  !memcmp("FOR4", &(uint32_t){PROJ_MAGIC}, 4));
     bad += check("FOR4 fits one flash object, the retained cache in NOINIT", sizeof(project_store_t) <= 4096u - 256u &&
                  sizeof(project_store_t) == 3840u && 0xC8u + 4u * sizeof(project_store_t) <= 0x3D50u);
-    bad += check("four machines: NENGINES 4, P_COUNT 112 (P_MOUT just before P_E0)", NENGINES == 4u && P_COUNT == 112u &&
+    bad += check("eight machines: NENGINES 8, P_COUNT 112 (P_MOUT just before P_E0)", NENGINES == 8u && P_COUNT == 112u &&
                  P_MOUT + 1u == P_E0);
     bad += check("name / FM6 area / MIDI offsets, 12 spare bytes before the retired area (MIDI IN's 3 among them)",
                  PROJ_NAME_OFF == 3824u && PROJ_FM6_OFF == 3312u && 68u + NTRK * (P_COUNT + 2u + NSTEP * 9u) +

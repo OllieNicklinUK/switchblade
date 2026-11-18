@@ -4,7 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #define __attribute__(x)
-#define NENGINES 4u                              /* (core.h: OB-Z WAVE ACID DRIFT) */
+#define NENGINES 8u                              /* (core.h, V2: OB-Z WAVE ACID DRIFT JP-Z CZ-Z GW-Z MICRO) */
 #define UP_SLOTS 32u
 static uint8_t fx_lowcut;
 static void fm1_led_key(unsigned k, int on) { (void)k; (void)on; }

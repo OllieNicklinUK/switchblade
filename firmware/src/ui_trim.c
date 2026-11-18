@@ -60,10 +60,17 @@ static const trim_t TRIM_DRIFT[] = {
     {TG_EDIT, 0, 24, 240, 3, JU_RED},                                  /* EDIT: the Juno's red band under the header */
     {TG_EDIT, 3, 211, 188, 1, JU_RED},  {TG_EDIT, 193, 211, 44, 1, JU_BLUE},
 };
-/* by engine (ENGI_OBX WAVE ACID DRIFT), the palette's trim index - 1 (gfx.c palette_set) */
+/* V2 placeholders until the UI phase: one rule under the header in the machine's theme colour */
+static const trim_t TRIM_JPZ[] = {{TG_HEAD, 0, 22, 240, 1, RGB(0x50, 0xaa, 0xff)}};
+static const trim_t TRIM_CZZ[] = {{TG_HEAD, 0, 22, 240, 1, RGB(0xe6, 0x46, 0x46)}};
+static const trim_t TRIM_GWZ[] = {{TG_HEAD, 0, 22, 240, 1, RGB(0xe6, 0xaa, 0x50)}};
+static const trim_t TRIM_MICRO[] = {{TG_HEAD, 0, 22, 240, 1, RGB(0x46, 0xc8, 0xdc)}};
+/* by engine (ENGI_OBX .. ENGI_MICRO), the palette's trim index - 1 (gfx.c palette_set) */
 static const struct { const trim_t *r; uint8_t n; } TRIM[NENGINES] = {
     {TRIM_OBZ, (uint8_t)TRIM_N(TRIM_OBZ)}, {TRIM_WAVE, (uint8_t)TRIM_N(TRIM_WAVE)},
     {TRIM_ACID, (uint8_t)TRIM_N(TRIM_ACID)}, {TRIM_DRIFT, (uint8_t)TRIM_N(TRIM_DRIFT)},
+    {TRIM_JPZ, (uint8_t)TRIM_N(TRIM_JPZ)}, {TRIM_CZZ, (uint8_t)TRIM_N(TRIM_CZZ)},
+    {TRIM_GWZ, (uint8_t)TRIM_N(TRIM_GWZ)}, {TRIM_MICRO, (uint8_t)TRIM_N(TRIM_MICRO)},
 };
 
 /* the trim of the pages in mask (TG_*) that lies on the canvas about to be drawn: its top left at screen (x0, y0), w x h

@@ -13,12 +13,17 @@
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
 #define HALF_FRAMES 128          /* I2S half buffer: 2.9 ms at 44.1 kHz (a key waits 0..1 half, then plays 1 half later) */
-#define NENGINES 4u              /* the four machines (engines.c ENGINES[]) */
-#define NENG_SHOWN 4u            /* the engines one can pick, in engines.c ENGINE_ORDER */
+#define NENGINES 8u              /* V2: the eight machines (engines.c ENGINES[]); ids 0..7 are stored: never reorder */
+#define NENG_SHOWN 8u            /* the engines one can pick, in engines.c ENGINE_ORDER */
+#define NPRESET 50u              /* V2: factory presets per machine (0..31 as 0.2-beta shipped them, 32..49 new) */
 #define ENGI_OBX 0u              /* OB-Z (eng_obx.c) */
 #define ENGI_WAVE 1u             /* WAVE (eng_wave.c, the VOID WAVE plugin's voice) */
 #define ENGI_ACID 2u             /* ACID (eng_acid.c) */
 #define ENGI_DRIFT 3u            /* DRIFT (eng_drift.c) */
+#define ENGI_JPZ 4u              /* V2: JP-Z, the JP-8000 Super Saw (eng_stub.c until Phase 3) */
+#define ENGI_CZZ 5u              /* V2: CZ-Z, Casio phase distortion (eng_stub.c until Phase 1) */
+#define ENGI_GWZ 6u              /* V2: GW-Z, ORGAN / VOX / ADD (eng_stub.c until Phase 2) */
+#define ENGI_MICRO 7u            /* V2: MICRO, the Waldorf Microwave I (eng_stub.c until Phase 4) */
 #define UP_SLOTS 32u             /* user presets (upreset.c) */
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
 

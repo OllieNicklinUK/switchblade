@@ -6,10 +6,10 @@
 
 Each source holds PRESETS, a list of dicts (see presets/four/obx.py for the fields; wave.py adds the void_px_t
 extras ftype voice detune spread glide lfo[5] fe[5] mx[4][3]). The generator enforces the contract and exits non-zero
-on any violation, so a build with a bad preset set fails: exactly 32 presets per machine, the categories and their
+on any violation, so a build with a bad preset set fails: exactly 50 presets per machine (V2; 0..31 the shipped ones), the categories and their
 counts of the machine (CATS), unique names of at most 12 characters in the large font's glyphs (GLYPHS), every e[i]
 inside the engine's edit[i] range (RANGES: a copy of the engines' tables; WAVE's from void_tables.h).
-Writes <M>_PRESETS[32], <M>_CAT[32] (CAT_*, category.c) for OBX WAVE ACID DRIFT, WAVE_PX[32], DRIFT_PX[32] (DRIFT's chor) and NANO_PX[32] (model, ftype).
+Writes <M>_PRESETS[50], <M>_CAT[50] (CAT_*, category.c) for OBX WAVE ACID DRIFT JPZ CZZ GWZ MICRO, WAVE_PX[50], DRIFT_PX[50] (DRIFT's chor) and NANO_PX[50] (model, ftype).
 """
 import re
 import sys
@@ -17,21 +17,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "presets" / "four"
-N = 32
-MACHINES = ["OBX", "WAVE", "ACID", "DRIFT"]                      # engine numbers 0..3 (core.h ENGI_*)
+N = 50                                                           # V2: 50 per machine (0..31 as in 0.2-beta, 32..49 new)
+N_OLD = 32                                                       # the presets 0.2-beta shipped: their numbers never move
+MACHINES = ["OBX", "WAVE", "ACID", "DRIFT", "JPZ", "CZZ", "GWZ", "MICRO"]   # engine numbers 0..7 (core.h ENGI_*)
 CAT_ORDER = ["BASS", "LEAD", "KEYS", "BRASS", "STRINGS", "ATMOS", "ACID"]     # category.c: CAT_NONE = 0, then these
 CATS = {                                                         # per machine: category -> count (in this order)
     "OBX": {"BRASS": 8, "STRINGS": 8, "KEYS": 8, "LEAD": 8},
     "WAVE": {"ATMOS": 8, "LEAD": 10, "BASS": 14},
     "ACID": {"ACID": 2, "BASS": 12, "LEAD": 5, "KEYS": 7, "ATMOS": 6},      # NANO (2026-10-21): the 303's 2, then the SUB model's 30 (fm1_subsynth_presets.h)
     "DRIFT": {"BASS": 12, "LEAD": 10, "KEYS": 10},
+    # the V2 machines (2026-11-17-eight-machines.md, section 8): all 50 count
+    "JPZ": {"LEAD": 16, "ATMOS": 14, "KEYS": 12, "BASS": 8},
+    "CZZ": {"KEYS": 14, "BASS": 12, "LEAD": 12, "ATMOS": 12},
+    "GWZ": {"KEYS": 22, "ATMOS": 12, "LEAD": 10, "BASS": 6},
+    "MICRO": {"ATMOS": 18, "KEYS": 12, "LEAD": 10, "BASS": 10},
 }
+# the four 0.2-beta machines: CATS counts presets 0..31; 32..49 are placeholders until Phase 5 (placeholder() below)
 GLYPHS = set(" #%+-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")      # the AF_L face (gen_aa_font.py L_CHARS)
 PCT = (0, 127)
 RANGES = {                                                       # edit[0..7] min..max (eng_obx.c, eng_acid.c, eng_drift.c)
     "OBX": [(0, 6)] + [PCT] * 7,
     "ACID": [(0, 1), (-64, 63)] + [PCT] * 6,
     "DRIFT": [PCT] * 8,
+    "JPZ": [PCT, PCT, (-64, 63), (-24, 24), PCT, PCT, PCT, PCT],      # eng_stub.c ENG_JPZ (DTN MIX BAL OSC2 CUT RES KTR WID)
+    "CZZ": [(0, 7), (0, 7), (0, 3)] + [PCT] * 5,                    # ENG_CZZ (WAV1 WAV2 LINE DTN CUT RES RING DCWE)
+    "GWZ": [(0, 15), (-64, 63), (-64, 63), (-64, 63)] + [PCT] * 4,   # ENG_GWZ (REG SUB BODY TOP CUT RES DRV ROTR)
+    "MICRO": [(0, 31), PCT, (-64, 63)] + [PCT] * 5,                 # ENG_MICRO (WT POS EPOS OSC2 CUT RES GRIT KTR)
 }
 WAVE_PX = dict(ftype=(0, 6), voice=(0, 3), detune=(0, 128), spread=PCT, glide=PCT, ldflt=(-64, 63), lsync=(0, 10))
 NANO_MODEL = (0, 1)                                              # NANO's model: 0 the 303, 1 SUB (eng_sub.c); the ACID category is the 303's
@@ -40,10 +51,22 @@ NANO_KEYS = ["model", "ftype", "mono1", "glide", "fa", "fd", "fs", "fr", "ktrk",
 DRIFT_CHOR = (0, 3)                                              # DRIFT's chor: the Juno chorus, 0 OFF, 1 I, 2 II, 3 I+II (absent = 0)
 
 
+def placeholder(src, first):
+    """V2 Phase 0.4: the presets after a 0.2-beta machine's 32, until Phase 5 voices them: copies of src (with every
+    extra a machine keeps), named SLOT <n> (n = first + 1 ..), flagged ph; they keep their source's category but are left
+    out of the category counts and of WAVE's distinctness rule"""
+    out = []
+    for i, p in enumerate(src):
+        q = dict(p, name=f"SLOT {first + i + 1}", ph=True)
+        q.pop("pat", None)
+        out.append(q)
+    return out
+
+
 def load(m):
     """PRESETS of presets/four/<m>.py, read as source (no .pyc: an edit within the same second and size is seen)"""
     path = SRC / f"{m.lower()}.py"
-    ns = {}
+    ns = {"placeholder": placeholder}
     exec(compile(path.read_text(), str(path), "exec"), ns)
     return ns["PRESETS"]
 
@@ -122,12 +145,17 @@ def validate(m, pr, rng, errs):
         errs.append(f"{m}: {len(pr)} presets, need {N}")
     count = {}
     names = set()
+    if m in ("OBX", "WAVE", "ACID", "DRIFT") and (any(p.get("ph") for p in pr[:N_OLD]) or
+                                                   not all(p.get("ph") for p in pr[N_OLD:])):
+        errs.append(f"{m}: presets 0..{N_OLD - 1} must be the shipped ones and {N_OLD}..{N - 1} placeholders "
+                    "(Phase 5 replaces them: then drop this check)")
     for k, p in enumerate(pr):
         who = f"{m}[{k}] {p.get('name')!r}"
         cat = p.get("cat")
         if cat not in allowed:
             errs.append(f"{who}: category {cat!r} not allowed for {m} ({', '.join(allowed)})")
-        count[cat] = count.get(cat, 0) + 1
+        if not p.get("ph"):
+            count[cat] = count.get(cat, 0) + 1
         nm = p.get("name", "")
         if not nm or len(nm) > 12:
             errs.append(f"{who}: name must be 1..12 characters")
@@ -181,7 +209,7 @@ def validate(m, pr, rng, errs):
                     for i, x in enumerate(r):
                         check_range(errs, who, f"mx[{j}][{i}]", x, -64 if i == 2 else 0, 63 if i == 2 else 127)
     if m == "WAVE":
-        check_distinct(errs, pr)
+        check_distinct(errs, [p for p in pr if not p.get("ph")])
     for cat, want in allowed.items():
         if count.get(cat, 0) != want:
             errs.append(f"{m}: {count.get(cat, 0)} {cat} presets, need {want}")

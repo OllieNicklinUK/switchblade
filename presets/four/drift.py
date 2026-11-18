@@ -70,3 +70,7 @@ PRESETS = [
     dict(name="STRING KEYS", cat="KEYS", e=[70, 81, 55, 0, 78, 10, 0, 64], env=[40, 90, 110, 80], fenv=8, mono=0,
          fx=(0, 65, 25, 55), pat=5, chor=2),
 ]
+
+# V2 Phase 0.4: presets 32..49 are placeholders (copies of 0..17, named SLOT 33..50) until Phase 5 voices them;
+# 0..31 above keep their numbers (saved projects and Program Changes load the same sound)
+PRESETS += placeholder(PRESETS[:18], 32)

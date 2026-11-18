@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 #define FELUCCA_FAVORITES 1
-#define FAV_ROWS 4u              /* the engines with a row of favourites: the four machines */
+#define FAV_ROWS 8u              /* the engines with a row of favourites: the eight machines (V2) */
 /* Stable engine/preset references; fixed capacity independent of optional engines. */
 typedef struct {
-    uint8_t factory[16][32]; /* engine 0..3, preset 0..255 (rows 4..13 unused; 14: the MIDI LEARN map, 15: settings) */
+    uint8_t factory[16][32]; /* engine 0..7, preset 0..255 (rows 8..13 unused; 14: the MIDI LEARN map, 15: settings) */
     uint32_t user, filter;
 } favorites_t;
 static favorites_t favorites __attribute__((section(".pool")));

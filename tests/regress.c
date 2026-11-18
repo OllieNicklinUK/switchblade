@@ -916,12 +916,17 @@ static void slug(char *d, const char *s, size_t n)
 }
 
 /* ------------------------------------------------------------- main --- */
-#define MAXJ 512
+#define MAXJ 2048                /* (V2: 8 machines x 50 presets, a golden and a CPU job each, and the rest) */
 static job_t J[MAXJ];
 static uint32_t nj;
 static job_t *add(uint32_t kind, const char *name)
 {
-    job_t *j = &J[nj++];
+    job_t *j;
+    if (nj >= MAXJ) {                                   /* (V2) loudly, not past the table */
+        fprintf(stderr, "regress: more than MAXJ (%u) jobs\n", (unsigned)MAXJ);
+        exit(2);
+    }
+    j = &J[nj++];
     memset(j, 0, sizeof *j);
     j->kind = (uint8_t)kind;
     snprintf(j->name, sizeof j->name, "%s", name);

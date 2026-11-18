@@ -1,14 +1,19 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
-/* Engine table: the four machines OB-Z, WAVE, ACID, DRIFT (order = PRESETS browsing order and the engine numbers
+/* Engine table: the eight machines OB-Z, WAVE, ACID, DRIFT, JP-Z, CZ-Z, GW-Z, MICRO (V2; order = PRESETS browsing order and the engine numbers
  * of the editor protocol), the factory patterns (SAVE > PHRASES) and the parts' sounds at power-on. */
 #include "dsp.c"
 #include "category.c"           /* the CAT_* numbers, and (with four_presets.h) every machine's 32 presets and their categories */
-_Static_assert(NELEM(OBX_PRESETS) == 32u && NELEM(OBX_CAT) == 32u, "OBX: 32 presets");
-_Static_assert(NELEM(WAVE_PRESETS) == 32u && NELEM(WAVE_CAT) == 32u, "WAVE: 32 presets");
-_Static_assert(NELEM(ACID_PRESETS) == 32u && NELEM(ACID_CAT) == 32u, "ACID: 32 presets");
-_Static_assert(NELEM(DRIFT_PRESETS) == 32u && NELEM(DRIFT_CAT) == 32u, "DRIFT: 32 presets");
-_Static_assert(NELEM(WAVE_PX) == 32u, "WAVE: 32 presets (WAVE_PX)");
+_Static_assert(NELEM(OBX_PRESETS) == NPRESET && NELEM(OBX_CAT) == NPRESET, "OBX: 50 presets");
+_Static_assert(NELEM(WAVE_PRESETS) == NPRESET && NELEM(WAVE_CAT) == NPRESET, "WAVE: 50 presets");
+_Static_assert(NELEM(ACID_PRESETS) == NPRESET && NELEM(ACID_CAT) == NPRESET, "ACID: 50 presets");
+_Static_assert(NELEM(DRIFT_PRESETS) == NPRESET && NELEM(DRIFT_CAT) == NPRESET, "DRIFT: 50 presets");
+_Static_assert(NELEM(WAVE_PX) == NPRESET, "WAVE: 50 presets (WAVE_PX)");
+_Static_assert(NELEM(DRIFT_PX) == NPRESET && NELEM(NANO_PX) == NPRESET, "DRIFT_PX, NANO_PX: 50 presets");
+_Static_assert(NELEM(JPZ_PRESETS) == NPRESET && NELEM(JPZ_CAT) == NPRESET, "JPZ: 50 presets");
+_Static_assert(NELEM(CZZ_PRESETS) == NPRESET && NELEM(CZZ_CAT) == NPRESET, "CZZ: 50 presets");
+_Static_assert(NELEM(GWZ_PRESETS) == NPRESET && NELEM(GWZ_CAT) == NPRESET, "GWZ: 50 presets");
+_Static_assert(NELEM(MICRO_PRESETS) == NPRESET && NELEM(MICRO_CAT) == NPRESET, "MICRO: 50 presets");
 
 /* The parts' engine memory (1.5): a part plays one engine at a time, so the engines with per-part state
  * (engine_t.mem: WAVE's voices) keep it in one region per part instead of an array each. The region holds the
@@ -26,6 +31,7 @@ static inline void *eng_mem_of(uint32_t p);
 #include "eng_acid.c"           /* ACID: the TB-303 voice (bass303.c, after Open303) */
 #include "eng_drift.c"          /* DRIFT: the Juno voice (dsp_va.c, after the Ultramaster KR-106) */
 #include "eng_wave.c"           /* WAVE: the VOID WAVE plugin's voice (wavetables: tools/gen_void_tables.py) */
+#include "eng_stub.c"           /* V2: JP-Z, CZ-Z, GW-Z, MICRO on a placeholder voice until their phases */
 ENG_MEM_FITS("DRIFT", DRIFT_MEM);
 ENG_MEM_FITS("ACID", ACID_MEM);    /* (against the region, not against WAVE: ACID owes the pool nothing but its own size; the test pins that the pool did not grow) */
 
@@ -45,6 +51,10 @@ static const engine_t *ENGINES_QUAL ENGINES[NENGINES] = {
     &ENG_WAVE,                   /* 1 (ENGI_WAVE) */
     &ENG_ACID,                   /* 2 (ENGI_ACID) */
     &ENG_DRIFT,                  /* 3 (ENGI_DRIFT) */
+    &ENG_JPZ,                    /* 4 (ENGI_JPZ) */
+    &ENG_CZZ,                    /* 5 (ENGI_CZZ) */
+    &ENG_GWZ,                    /* 6 (ENGI_GWZ) */
+    &ENG_MICRO,                  /* 7 (ENGI_MICRO) */
 };
 
 /* a track's engine number as an index (the audio paths: a compare, cheaper than % NENGINES; a bad number: 0) */
@@ -70,7 +80,7 @@ static void eng_mem_claim(const track_t *t)
 }
 
 /* the order the engines are shown in (PRESETS browsing and its ENG knob, the EDIT layer's keys, the editor's list) */
-static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {0, 1, 2, 3};
+static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 /* the engines one can pick, in ENGINE_ORDER: eng_ok(e), the n-th of them eng_vis(n), e's place among them
  * eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */

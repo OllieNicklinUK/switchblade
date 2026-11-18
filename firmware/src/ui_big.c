@@ -32,7 +32,8 @@
 #define BIG_FIT (KNOB_XL_R - KNOB_XL_W - 2)             /* the value's ink inside this radius: 2 px clear of the ring */
 #define BIG_UY 76                                       /* the unit's line (S capitals rows 79 .. 87) */
 
-static const char *const BIG_MLABEL[NENGINES] = {"DETUNE", "POSITION", "DECAY", "DRIVE"};   /* knob[3] spelled out
+static const char *const BIG_MLABEL[NENGINES] = {"DETUNE", "POSITION", "DECAY", "DRIVE",
+                                                 "DETUNE", "DCW ENV", "ROTOR", "ENV POS"};   /* (V2: JP-Z CZ-Z GW-Z MICRO) */   /* knob[3] spelled out
                                                          * (the 4-letter edit[].label stays the MACHINE pages') */
 static uint32_t big_sig[2];
 

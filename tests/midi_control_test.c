@@ -661,7 +661,7 @@ static int test_cc_contract(void)
     int bad = 0; uint32_t e, k; char b[64];
     midi_test_reset();
     for (e = 0; e < NENGINES; e++) {
-        track_t *t = &trk[e];
+        track_t *t = &trk[e % NTRK];                  /* (V2: 8 machines on 4 tracks) */
         t->engine = t->eng_req = (uint8_t)e;
         for (k = 0; k < 4; k++) {
             snprintf(b, sizeof b, "%s CC%u", ENGINES[e]->name, CC_KNOB[k]);

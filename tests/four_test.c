@@ -1,4 +1,4 @@
-/* four_test.c: the four-machine contract */
+/* four_test.c: the machine contract (V2: eight machines, 50 presets each) */
 #define ENGINES_QUAL
 #define main hostsim_main
 #include "hostsim.c"
@@ -8,9 +8,9 @@ static int fails;
 
 static void test_engine_table(void)
 {
-    static const char *const NAME[4] = {"OB-Z", "WAVE", "NANO", "JUNO"};
+    static const char *const NAME[8] = {"OB-Z", "WAVE", "NANO", "JUNO", "JP-Z", "CZ-Z", "GW-Z", "MICRO"};
     uint32_t e;
-    CHECK(NENGINES == 4u, "NENGINES %u", (unsigned)NENGINES);
+    CHECK(NENGINES == 8u && NELEM(NAME) == NENGINES, "NENGINES %u", (unsigned)NENGINES);   /* (V2: the ids 0..7 are stored: never reordered) */
     for (e = 0; e < NENGINES; e++) {
         CHECK(strcmp(ENGINES[e]->name, NAME[e]) == 0, "engine %u is %s", (unsigned)e, ENGINES[e]->name);
         CHECK(ENGINES[e]->knob[0] == P_E4, "%s K1 not CUT", NAME[e]);
@@ -21,6 +21,10 @@ static void test_engine_table(void)
     CHECK(ENGINES[ENGI_WAVE]->knob[3] == P_E1, "WAVE K4");
     CHECK(ENGINES[ENGI_ACID]->knob[3] == P_E2, "ACID K4");
     CHECK(ENGINES[ENGI_DRIFT]->knob[3] == P_E6, "DRIFT K4");
+    CHECK(ENGINES[ENGI_JPZ]->knob[3] == P_E0, "JP-Z K4 (DTN)");
+    CHECK(ENGINES[ENGI_CZZ]->knob[3] == P_E7, "CZ-Z K4 (DCW ENV)");
+    CHECK(ENGINES[ENGI_GWZ]->knob[3] == P_E7, "GW-Z K4 (ROTOR)");
+    CHECK(ENGINES[ENGI_MICRO]->knob[3] == P_E2, "MICRO K4 (ENV -> POS)");
     CHECK(ENGINES[ENGI_ACID]->poly == 1u, "ACID mono");
     {   /* NANO's SUB model (2026-10-21): the module's own envelopes, SUB_POLY voices; the 303 its own envelope, one */
         track_t t;
@@ -38,7 +42,7 @@ static void test_presets(void)
 {
     uint32_t e, k;
     for (e = 0; e < NENGINES; e++) {
-        CHECK(ENGINES[e]->npresets == 32u, "%s has %u presets", ENGINES[e]->name, ENGINES[e]->npresets);
+        CHECK(ENGINES[e]->npresets == NPRESET && NPRESET == 50u, "%s has %u presets", ENGINES[e]->name, ENGINES[e]->npresets);
         for (k = 0; k < ENGINES[e]->npresets; k++) {
             uint32_t c = preset_cat(e, k);
             CHECK(c >= CAT_BASS && c < NCAT, "%s/%u no category", ENGINES[e]->name, (unsigned)k);
@@ -47,10 +51,10 @@ static void test_presets(void)
             CHECK(strlen(ENGINES[e]->presets[k].name) <= 12u, "name too long");
         }
     }
-    CHECK(NELEM(WAVE_PX) == 32u, "WAVE_PX %u", (unsigned)NELEM(WAVE_PX));
+    CHECK(NELEM(WAVE_PX) == NPRESET, "WAVE_PX %u", (unsigned)NELEM(WAVE_PX));
     {   /* DRIFT's chorus (Task 6.2): DRIFT_PX[k] is preset k's CHOR (0 OFF, 1 I, 2 II, 3 I+II); a load sets it, any other engine's load resets it */
         uint32_t nb = 0, nk = 0, non = 0;
-        CHECK(NELEM(DRIFT_PX) == 32u, "DRIFT_PX %u", (unsigned)NELEM(DRIFT_PX));
+        CHECK(NELEM(DRIFT_PX) == NPRESET, "DRIFT_PX %u", (unsigned)NELEM(DRIFT_PX));
         for (k = 0; k < 32u && k < NELEM(DRIFT_PX); k++) {
             uint32_t c = preset_cat(ENGI_DRIFT, k);
             CHECK(DRIFT_PX[k] <= 3u, "DRIFT_PX[%u] = %u", (unsigned)k, (unsigned)DRIFT_PX[k]);

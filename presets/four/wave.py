@@ -98,3 +98,7 @@ PRESETS = [
     P("UNDERWORLD", "BASS", "UNISON+LFO->CUT", 6, 30, 40, 30, 50, [0, 80, 115, 40], 0, fenv=8, voice=3, detune=31,
       spread=30, lfo=[1, 62, 0, 0, 0], ldflt=15, lsync=3),
 ]
+
+# V2 Phase 0.4: presets 32..49 are placeholders (copies of 0..17, named SLOT 33..50) until Phase 5 voices them;
+# 0..31 above keep their numbers (saved projects and Program Changes load the same sound)
+PRESETS += placeholder(PRESETS[:18], 32)

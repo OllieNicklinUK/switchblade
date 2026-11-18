@@ -413,7 +413,7 @@ static int test_sound_loads(void)
     before = *t;
     go_page(GR_BROWSE);                           /* (VOID FOUR: HOME's PRESETS stays in the machine; the PRESETS page
                                                    * browses every machine) */
-    for (i = 0; i < 40u && t->eng_req == before.eng_req; i++)     /* several loads, into the next engine */
+    for (i = 0; i < 2u * NPRESET && t->eng_req == before.eng_req; i++)     /* several loads, into the next engine (V2: 50 a machine) */
         turn(EN_PRESET, 1);
     go_home(); frame();
     bad += check("browsing on (PRESETS page), into another engine: the steps still untouched", t->eng_req != before.eng_req &&
@@ -1263,7 +1263,7 @@ static int test_machine_palette(void)
         set_engine_of(TSEL, e);
         ui.force = 0;
         ui_draw();
-        ok &= ux.trim == 1u + e && T_BG == bg[e];
+        ok &= ux.trim == 1u + e && T_BG == (e < NTRK ? bg[e] : UI_MACHINE_PALS[e].bg);   /* (V2: machines 4..7 are on no track above) */
     }
     bad += check("MACHINE mode: changing the selected track's machine sets that machine's palette", ok);
     {   /* the change is one full redraw (ui.force): no pixel of the old machine's background is left on the screen */
@@ -3440,13 +3440,13 @@ static int screen_has_text(const char *s)            /* a big card drew s as its
 }
 static int test_edit_big(void)
 {
-    static const char *const MLBL[NENGINES] = {"DETUNE", "POSITION", "DECAY", "DRIVE"};
+    static const char *const MLBL[NENGINES] = {"DETUNE", "POSITION", "DECAY", "DRIVE", "DETUNE", "DCW ENV", "ROTOR", "ENV POS"};
     int bad = 0;
     uint32_t e;
     for (e = 0; e < NENGINES; e++) {
         int16_t cut0, k4, env0;
         int ok;
-        ui_power_on(); song.sel = (uint8_t)e; set_engine_of(TSEL, e); frame();
+        ui_power_on(); song.sel = (uint8_t)(e % NTRK); set_engine_of(TSEL, e); frame();   /* (V2: 8 machines, 4 tracks) */
         memset(big_lbl, 0, sizeof big_lbl);
         press(B_EDIT); frame();
         bad += check("EDIT opens the big page", str_eq(PAGES[ui.page].title, "EDIT") && !ui.home);
@@ -3467,8 +3467,9 @@ static int test_edit_big(void)
         bad += check("  labels CUTOFF RESONANCE ENV and the machine's, spelled out",
                      screen_has_text("CUTOFF") && screen_has_text("RESONANCE") && screen_has_text("ENV") &&
                      screen_has_text(MLBL[e]) && str_eq(big_lbl[3], MLBL[e]));
-        bad += check("  a two-figure value: on the LED (OB-Z, ACID, DRIFT), in L inside WAVE's ring", (TSEL->p[ENGINES[e]->knob[3]] = 40, ui.force = 1, frame(),
-                                                   str_len(big_val[3]) == 2u && (e == ENGI_WAVE ? big_face[3] == 1 : big_face[3] == 3)));
+        bad += check("  a two-figure value: on the LED (OB-Z, ACID, DRIFT, the V2 four), in L inside WAVE's ring", (TSEL->p[ENGINES[e]->knob[3]] = 40, ui.force = 1, frame(),
+                                                   str_len(big_val[3]) == (param_desc_of(e, ENGINES[e]->knob[3])->fmt == F_BIPCT ? 3u : 2u) &&
+                                                   (e == ENGI_WAVE ? big_face[3] == 1 : big_face[3] == 3)));
         {   /* MIDI LEARN: a turn picks the parameter of the card (ml_knob), as on every page */
             ml_toggle(); turn(EN_K2, 1); frame();
             bad += check("  MIDI LEARN: K2 picks RES (P_E5)", ui.ml.on && ui.ml.id == P_E5);
@@ -3521,7 +3522,7 @@ static int test_edit_controls(void)
     int bad = 0, ok;
     uint32_t e, k, i;
     for (e = 0; e < NENGINES; e++) {
-        ui_power_on(); song.sel = (uint8_t)e; set_engine_of(TSEL, e); frame();
+        ui_power_on(); song.sel = (uint8_t)(e % NTRK); set_engine_of(TSEL, e); frame();
         press(B_EDIT); frames(320);
         TSEL->p[P_E4] = 40; TSEL->p[P_E5] = 100; TSEL->p[P_ED_FLT] = 0; TSEL->p[ENGINES[e]->knob[3]] = 64; ui.force = 1; frame();
         if (e == ENGI_OBX) {
@@ -3569,7 +3570,7 @@ static int test_edit_controls(void)
             for (k = 1; k < 4u; k++)                                                 /* the other three faders carry a cap each */
                 ok &= scr_count(ED_FX(k) - 9, ED_F0 - 8, ED_FX(k) + 10, ED_F1 + 8, T_KEY) > 100u;
             bad += check("EDIT DRIFT: four tan-capped faders; the cap's place is the value (min bottom, max top)", ok);
-        } else {
+        } else if (e == ENGI_WAVE) {                                                 /* (V2: JP-Z .. MICRO: their looks come with the UI phase) */
             ok = scr_count(13, 25, 227, 118, T_THEME) > 150u;                        /* WAVE: the amber arcs */
             bad += check("EDIT WAVE: the amber glowing rings", ok);
         }
@@ -3613,19 +3614,19 @@ static int test_home_big(void)
                  song.g[G_BPM] == b0 && !strncmp(ui.msg, "VOLUME ", 7));
     turn(EN_ALGO, 1); frame();
     bad += check("  ALGORITHM selects the track", song.sel == 1u);
-    {   /* PRESETS: this machine's 32 and its user presets only, round */
+    {   /* PRESETS: this machine's 50 (V2) and its user presets only, round */
         ui_power_on(); go_home(); frame();
-        song.sel = 1; apply_preset(31); frame();
+        song.sel = 1; apply_preset(NPRESET - 1u); frame();
         turn(EN_PRESET, 1); frame();
         ok = TSEL->eng_req == ENGI_WAVE && TSEL->preset == 0u;
         turn(EN_PRESET, -1); frame();
-        ok &= TSEL->eng_req == ENGI_WAVE && TSEL->preset == 31u;
-        bad += check("  PRESETS steps the machine's own 32, round (never another machine)", ok);
+        ok &= TSEL->eng_req == ENGI_WAVE && TSEL->preset == NPRESET - 1u;
+        bad += check("  PRESETS steps the machine's own 50, round (never another machine)", ok);
     }
     {   /* the preset panel: the category, "07 / 32", the name (L where it fits); the cards: EDIT's values */
         ui_power_on(); go_home(); song.sel = 0; apply_preset(9); ui.force = 1; frame();
-        bad += check("  the panel: category, number 10 / 32, the name", str_eq(home_cat, CAT_NAME[preset_cat(ENGI_OBX, 9)]) &&
-                     str_eq(home_num, "10 / 32") && str_eq(home_name, ENGINES[ENGI_OBX]->presets[9].name));
+        bad += check("  the panel: category, number 10 / 50, the name", str_eq(home_cat, CAT_NAME[preset_cat(ENGI_OBX, 9)]) &&
+                     str_eq(home_num, "10 / 50") && str_eq(home_name, ENGINES[ENGI_OBX]->presets[9].name));
         bad += check("  .. the name in M (the rack unit's face)", home_face == 2);
         ok = 1;
         for (k = 0; k < 4u; k++) {
@@ -3836,15 +3837,15 @@ static int test_pages_four(void)
     return bad;
 }
 
-/* VOID FOUR: the EDIT layer (EDIT held) offers the four machines, one white key each, then INIT and CLEAN INIT */
+/* the EDIT layer (EDIT held) offers the machines (V2: eight), one white key each, then INIT and CLEAN INIT */
 static int test_edit_layer_four(void)
 {
     int bad = 0, ok;
     uint32_t i, seen = 0, e;
     ui_power_on(); go_home(); frame();
-    ok = NENG_SHOWN == 4u && NENGINES == 4u && LY_INIT == 4u;
+    ok = NENG_SHOWN == 8u && NENGINES == 8u && LY_INIT == 8u;   /* (V2: eight machines, INIT on the 9th white key) */
     btn_down(B_EDIT); frames(480);
-    for (i = 0; i < 4u; i++) {
+    for (i = 0; i < NENG_SHOWN; i++) {                 /* (V2: eight) */
         key_down(white(i)); key_up(white(i)); frame();
         seen |= 1u << TSEL->eng_req;
     }
@@ -3852,13 +3853,13 @@ static int test_edit_layer_four(void)
     for (i = 0; i < 5u; i++) {                         /* the black keys: nothing */
         key_down(key_at(1, i)); key_up(key_at(1, i)); frame();
     }
-    ok &= seen == 15u && TSEL->eng_req == e;
+    ok &= seen == (1u << NENG_SHOWN) - 1u && TSEL->eng_req == e;
     btn_up(B_EDIT); frame();
     e = TSEL->eng_req;
-    for (i = 0; i < 4u; i++)
+    for (i = 0; i < NENG_SHOWN; i++)
         e = eng_step(e, 1);
     ok &= e == TSEL->eng_req;
-    bad += check("EDIT layer: white keys 1..4 the four machines (all four, nothing else), KNOB 1 round four", ok);
+    bad += check("EDIT layer: white keys 1..8 the eight machines (all eight, nothing else), KNOB 1 round eight", ok);
     return bad;
 }
 
@@ -4013,11 +4014,11 @@ static int test_quick_layers(void)
     key_down(white(1)); key_up(white(1)); frame();
     ok &= TSEL->eng_req == ENGI_WAVE;                   /* (G3: WAVE, second in ENGINE_ORDER) */
     key_down(white(NENG_SHOWN - 1u)); key_up(white(NENG_SHOWN - 1u)); frame();
-    ok &= TSEL->eng_req == ENGI_DRIFT;                  /* (the last key: DRIFT) */
+    ok &= TSEL->eng_req == ENGI_MICRO;                  /* (the last key: MICRO, V2) */
     ok &= !memcmp(TSEL->step, before.step, sizeof before.step) && TSEL->p[P_SLEN] == before.p[P_SLEN] &&
           TSEL->p[P_SLCR] == SL_STUT;
     btn_up(B_EDIT); frame();
-    bad += check("EDIT + white key n: the n-th engine shown (WAVE 2nd, DRIFT last), while playing; steps, LEN, SLICER stay", ok);
+    bad += check("EDIT + white key n: the n-th engine shown (WAVE 2nd, MICRO last), while playing; steps, LEN, SLICER stay", ok);
     hold(B_SAVE);
     bad += check("  SAVE held: UNDO back to before the layer's loads, the steps untouched",
                  TSEL->eng_req == 0u && TSEL->preset == before.preset && !memcmp(TSEL->step, before.step, sizeof before.step));
