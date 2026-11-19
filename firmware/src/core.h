@@ -161,6 +161,8 @@ typedef struct {                 /* WAVE's extras of a factory preset (WAVE_PX, 
     int8_t mx[4][3];             /* the matrix: SRC, DST, AMT per slot */
     int8_t ldflt;                /* P_LD_FLT: the LFO's own depth on the filter (LFO DEST FLT, -64..63) */
     uint8_t lsync;               /* P_LSYNC: LFO SYNC (0 OFF, else a note value of the tempo, params.c N_LSYNC) */
+    uint8_t nz[3];               /* V2: NOISE (P_FM2_ATK), its COLOR (P_FM2_SUS, 127 white), the sub's octave (P_FM2_DEC, >= 64: two down) */
+    uint8_t olvl;                /* V2: the oscillator's level (P_FM3_ATK, 64 = the plugin's 0.8) */
 } void_px_t;
 #define FX(d, c, dl, r) .fx = {(d) + 1, (c) + 1, (dl) + 1, (r) + 1}
 #define PAT(n) .pat = (n)

@@ -9,8 +9,14 @@ acid_render 103
 bass303_render 8524
 sub_render 3028
 drift_render 46616
-void_render 8579
-void_block_slow 1135
+void_render 26981
+void_block_slow 920
+micro_render 169
+gw_render 901
+gw_block 80
+jpz_render 216
+cz_render 114
+cz_wave 18
 slicer_track 557
 fm1_alnk0_irq 30886
 fm1_timer5_irq 35390
@@ -34,9 +40,3 @@ track_insert 3
 ins_drive 277
 ins_swept 230
 track_dist 56
-cz_render 114
-cz_wave 18
-jpz_render 216
-gw_render 901
-gw_block 80
-micro_render 169

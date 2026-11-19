@@ -328,7 +328,7 @@ if [ -f build/gen/felucca_tables.h ]; then
     else
         echo "== VOID wavetables: skipped (no numpy)"
     fi
-    VW="${VOIDWAVE_DIR:-../VoidWave}"
+    VW="${VOIDWAVE_DIR:-../../VOID SYNTH/VoidWave}"   # V2 (2026-11-19): the V2 plugin, D:/VOID SYNTH (V1 was ../VoidWave)
     mkdir -p build/void_ref build/void_demo
     if [ -f "$VW/Source/DSP/Filter.cpp" ] && ${CXX:-c++} -std=c++17 -O2 -Itools/void_ref -I"$VW/Source/DSP" \
             -o "$OUT/void_ref" tools/void_ref.cpp "$VW/Source/DSP/Filter.cpp" 2>/dev/null; then

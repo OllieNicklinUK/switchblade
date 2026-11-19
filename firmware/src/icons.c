@@ -136,7 +136,7 @@ static const icon_map_t ICON_MAP[] = {
     /* engines (eng_*.c edit[] labels; VOID FOUR: the four machines', the retired engines' gone) */
     {"DTN", ICON_DETUNE}, {"NOIS", ICON_NOISE}, {"CUT", ICON_CUTOFF}, {"RES", ICON_RESO},
     {"PW", ICON_PULSE}, {"SLOP", ICON_VIBRATO},        /* OB-Z's E3 and E7 (its E6 MODE: param_icon) */
-    {"DRV", ICON_DRIVE}, {"KTR", ICON_KEYTRACK}, {"TONE", ICON_TONE}, {"BITS", ICON_BITS}, {"SUB", ICON_SUB},
+    {"DRV", ICON_DRIVE}, {"KTR", ICON_KEYTRACK}, {"TONE", ICON_TONE}, {"BITS", ICON_BITS}, {"SUB", ICON_SUB}, {"PENV", ICON_PITCH},
     {"POS", ICON_PHASE}, {"SPRD", ICON_NOISE}, {"CHRD", ICON_SCALE}, {"DECY", ICON_DECAY}, {"DRFT", ICON_SWEEP},
     {"ENV", ICON_ENV}, {"ARP", ICON_ARP},
     /* fixed columns drawn by ui_draw.c (STEP page, preset browser) */

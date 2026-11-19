@@ -3398,8 +3398,8 @@ static int test_edit_cycle(void)
 {
     static const char *const CYC_A[] = {"EDIT", "MACHINE 1", "MACHINE 2", "FILTER", "VOICE", "VOICE 2", "VOICE 3",
                                         "EDIT"};   /* (1.5: FILTER; VOID FOUR: the big EDIT page first) */
-    static const char *const CYC_W[] = {"EDIT", "MACHINE 1", "MACHINE 2", "FILTER", "FLT ENV", "VOICE", "VOICE 2",
-                                        "VOICE 3", "EDIT"};
+    static const char *const CYC_W[] = {"EDIT", "MACHINE 1", "MACHINE 2", "FILTER", "FLT ENV", "NOISE", "VOICE", "VOICE 2",
+                                        "VOICE 3", "EDIT"};   /* (V2: NOISE, WAVE's noise) */
     static const char *const CYC_P[] = {"EDIT", "MACHINE 1", "MACHINE 2", "VOICE", "VOICE 2", "VOICE 3", "EDIT"};   /* ACID, DRIFT */
     static const char *const CYC_D[] = {"EDIT", "MACHINE 1", "MACHINE 2", "VOICE", "VOICE 2", "VOICE 3", "JUNO", "EDIT"};   /* DRIFT: + its chorus (Task 6.2) */
     int bad = 0, ok;
@@ -3415,7 +3415,7 @@ static int test_edit_cycle(void)
     set_engine_of(TSEL, 0);
     bad += check("EDIT cycle (OB-Z): EDIT MACHINE 1 MACHINE 2 FILTER VOICE VOICE 2 VOICE 3 EDIT", engine_cycle(CYC_A, NELEM(CYC_A)));
     set_engine_of(TSEL, ENGI_WAVE);
-    bad += check("EDIT cycle (WAVE): EDIT MACHINE 1 MACHINE 2 FILTER FLT ENV VOICE VOICE 2 VOICE 3 EDIT", engine_cycle(CYC_W, NELEM(CYC_W)));
+    bad += check("EDIT cycle (WAVE): EDIT MACHINE 1 MACHINE 2 FILTER FLT ENV NOISE VOICE VOICE 2 VOICE 3 EDIT", engine_cycle(CYC_W, NELEM(CYC_W)));
     set_engine_of(TSEL, ENGI_ACID);
     bad += check("EDIT cycle (ACID): EDIT MACHINE 1 MACHINE 2 VOICE VOICE 2 VOICE 3 EDIT (no FILTER)", engine_cycle(CYC_P, NELEM(CYC_P)));
     set_engine_of(TSEL, ENGI_DRIFT);
@@ -3801,10 +3801,10 @@ static int test_pages_four(void)
     for (e = 0; e < NENGINES; e++) {
         ui_power_on(); set_engine_of(TSEL, e);
         for (i = 0; i < NPAGES; i++)
-            if (str_eq(PAGES[i].title, "FLT ENV"))
+            if (str_eq(PAGES[i].title, "FLT ENV") || str_eq(PAGES[i].title, "NOISE"))
                 ok &= page_visible(i) == (e == ENGI_WAVE);
     }
-    bad += check("FLT ENV for WAVE only", ok);
+    bad += check("FLT ENV and NOISE for WAVE only", ok);
     {   /* the icons by label: each label once, none of a retired engine's controls (ALG, KIT, MODEL, LANE, ..) */
         static const char *const OLD[] = {"ALG", "R2", "IDX", "FB", "CHIP", "DUTY", "KIT", "KICK", "MODEL", "STRC",
                                           "VOWL", "TALK", "MLVL", "MRAT", "LANE", "HIT", "SRC", "START", "DENS", "REG"};

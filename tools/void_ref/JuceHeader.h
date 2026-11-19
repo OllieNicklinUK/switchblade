@@ -14,5 +14,28 @@ template <typename T> struct MathConstants {
     static constexpr T halfPi = (T)1.570796326794896619;
 };
 template <typename... T> void ignoreUnused(T &&...) {}
+/* the V2 plugin's Filter.h (D:/VOID SYNTH): its drive / resonance smoothers, JUCE's linear SmoothedValue */
+namespace ValueSmoothingTypes { struct Linear {}; }
+template <typename F, typename Kind = ValueSmoothingTypes::Linear> struct SmoothedValue {
+    F cur = 0, tgt = 0, step = 0;
+    int left = 0, len = 0;
+    void reset(double sr, double sec) { len = (int)std::floor(sr * sec); left = 0; cur = tgt; }
+    void setCurrentAndTargetValue(F v) { cur = tgt = v; left = 0; }
+    void setTargetValue(F v)
+    {
+        if (v == tgt) return;
+        if (len <= 0) { setCurrentAndTargetValue(v); return; }
+        tgt = v; left = len; step = (tgt - cur) / (F)left;
+    }
+    F getNextValue()
+    {
+        if (left <= 0) return tgt;
+        if (--left == 0) cur = tgt; else cur += step;
+        return cur;
+    }
+    F getCurrentValue() const { return cur; }
+    F getTargetValue() const { return tgt; }
+    bool isSmoothing() const { return left > 0; }
+};
 }
 #define JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(x)
