@@ -19,6 +19,38 @@ typedef struct { double rms, bright, dc; } meas_t;
 static int32_t buf[NB * CTL];
 
 /* part 1 on CZ-Z preset pi with E overrides (-999: the preset's), one note for NB blocks; the last two thirds measured */
+/* The scenarios below were written on the first voicing's CZ BASS and CZ BRASS. Since 2026-11-19 the bank is the CZ-230S's tones,
+ * so those two are kept here as they were (their edits, ADSR and 8-step DCW envelope in the part's slots): the checks measure what
+ * they always did. Every factory preset is still played as itself where the test loops over all of them. */
+#define CZ_OLD_BASS 1000u
+#define CZ_OLD_BRASS 1001u
+static void cz_load(uint32_t pi)
+{
+    static const int16_t E[2][8] = {{0, 0, 0, 0, 10, 0, 0, 110}, {0, 0, 2, 8, 10, 20, 0, 100}};
+    static const uint8_t ENV[2][4] = {{0, 60, 80, 20}, {8, 60, 90, 30}};
+    static const uint8_t PX[2][19] = {{99, 55, 0, 0, 0, 0, 0, 0, 99, 30, 0, 0, 0, 0, 0, 0, 1, 1, 2},
+                                      {70, 40, 50, 0, 0, 0, 0, 0, 99, 60, 0, 0, 0, 0, 0, 0, 1, 2, 2}};
+    track_t *t = &trk[0];
+    uint32_t i, w;
+    if (pi < CZ_OLD_BASS) {
+        host_preset(t, ENGI_CZZ, pi);
+        return;
+    }
+    w = pi - CZ_OLD_BASS;
+    host_preset(t, ENGI_CZZ, 0);
+    for (i = 0; i < P_E0; i++)
+        if (!param_kept(i))
+            t->p[i] = TP[i].def;
+    for (i = 0; i < 8u; i++)
+        t->p[P_E0 + i] = E[w][i];
+    t->p[P_ATK] = ENV[w][0], t->p[P_DEC] = ENV[w][1], t->p[P_SUS] = ENV[w][2], t->p[P_REL] = ENV[w][3];
+    t->p[P_ED_FLT] = 0;
+    t->p[P_VOICE] = V_LEGATO;
+    for (i = 0; i < 19u; i++)
+        t->p[CZ_ENV + i] = PX[w][i];
+    t->p[CZ_ENV_OK] = 1;
+}
+
 static meas_t play(uint32_t pi, const int16_t *e, uint32_t note, uint32_t gate_blocks)
 {
     meas_t r = {0, 0, 0};
@@ -28,7 +60,7 @@ static meas_t play(uint32_t pi, const int16_t *e, uint32_t note, uint32_t gate_b
     memset(trk[0].v, 0, sizeof trk[0].v);              /* (silent voices: the last play's tail would be retriggered) */
     lim_env = LIM_T;                                   /* (the master's limiter and DC filter as at power-on) */
     lc_l1 = lc_l2 = lc_r1 = lc_r2 = dc_l = dc_r = dce_l = dce_r = 0;
-    host_preset(&trk[0], ENGI_CZZ, pi);
+    cz_load(pi);
     trk[0].p[P_LEVEL] = 100;
     if (e && e[0] == -998)                             /* (the envelope held at 99: DCWE's full reach) */
         trk[0].p[CZ_ENV + 8] = trk[0].p[CZ_ENV + 9] = 99;
@@ -72,7 +104,7 @@ static uint32_t preset_named(const char *name)
 
 int main(void)
 {
-    uint32_t bass = preset_named("CZ BASS"), k;
+    uint32_t bass = CZ_OLD_BASS, k;                      /* (the first voicing's CZ BASS: cz_load) */
     int16_t e[8];
     meas_t a, b, c;
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -120,7 +152,7 @@ int main(void)
         voice_t *v;
         uint32_t i;
         host_tracks_init();
-        host_preset(&trk[0], ENGI_CZZ, bass);           /* CZ BASS: rates 99 55, levels 99 30, SUS 1, END 1 */
+        cz_load(bass);                                   /* CZ BASS: rates 99 55, levels 99 30, SUS 1, END 1 */
         trk[0].p[P_REL] = 127;                           /* (a long amp release: the voice outlives the envelope's) */
         check("the preset's envelope in the part's slots (CZ_PX -> FM1..FM4), marked", trk[0].p[CZ_ENV_OK] == 1 &&
               trk[0].p[CZ_ENV] == 99 && trk[0].p[CZ_ENV + 8] == 99 && trk[0].p[CZ_ENV + 9] == 30 && trk[0].p[CZ_ENV + 16] == 1);
@@ -133,7 +165,7 @@ int main(void)
         if (!(v->s[1] >= 2 && v->s[0] == 30 << 16))
             printf("cz:   (after the release: active %u gate %u stage %u step %d level %d)\n", v->active, v->gate, v->stage, v->s[1], v->s[0]);
         check("  released: on past SUS (END is SUS here: it holds its level)", v->s[1] >= 2 && v->s[0] == 30 << 16);
-        host_preset(&trk[0], ENGI_CZZ, preset_named("CZ BRASS"));   /* rates 70 40 50, levels 99 60 0, SUS 1, END 2 */
+        cz_load(CZ_OLD_BRASS);                           /* CZ BRASS: rates 70 40 50, levels 99 60 0, SUS 1, END 2 */
         trk[0].p[P_REL] = 127;
         trk_note_on(&trk[0], 48, 100);
         for (i = 0; i < 2000u; i++) { int32_t o[2 * CTL]; mix_block(o, CTL); }

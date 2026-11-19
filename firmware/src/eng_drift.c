@@ -239,6 +239,8 @@ static void drift_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
     cents = drft * (5.0f * c->unit + (fm_sin_turns(c->walk[0]) + fm_sin_turns(c->walk[1]) + fm_sin_turns(c->walk[2])) * 1.0f) + var * 3.0f * c->v_pit;
     {
         float e = (float)(m->pitch16 - 69 * 16) * (1.0f / 192.0f) + cents * (1.0f / 1200.0f);
+        if (t->p[P_FM4_DEC])                       /* a KR-106 preset's octave switch (DRIFT_LX[7]: 0 none, else - 3 octaves) */
+            e += (float)(clamp(t->p[P_FM4_DEC], 1, 5) - 3);
         hz = 440.0f * drift_exp2f(e);
         if (m->fine)
             hz *= 1.0f + (float)m->fine * (1.0f / 4096.0f);
@@ -379,10 +381,21 @@ static int drift_part_fx(track_t *t, int32_t *b, int32_t *z, uint32_t n)
 
 /* a preset just loaded on track t (ui.c apply_preset_to, after the defaults and the preset's own values; tests/hostsim.c): its chorus */
 _Static_assert(NELEM(DRIFT_PX) == NELEM(DRIFT_PRESETS), "DRIFT_PX: one per preset");
+_Static_assert(NELEM(DRIFT_LX) == NELEM(DRIFT_PRESETS), "DRIFT_LX: one per preset");
 static void drift_track_loaded(track_t *t)
 {
-    if (t->eng_req % NENGINES == ENGI_DRIFT && t->preset < NELEM(DRIFT_PX))
-        t->p[P_RSV_LN] = DRIFT_PX[t->preset];
+    const int8_t *x;
+    if (t->eng_req % NENGINES != ENGI_DRIFT || t->preset >= NELEM(DRIFT_PX))
+        return;
+    t->p[P_RSV_LN] = DRIFT_PX[t->preset];
+    x = DRIFT_LX[t->preset];                       /* (2026-11-19) the KR-106 presets' HPF and LFO; zeros: the defaults, */
+    t->p[P_FTYPE] = x[0];                          /* the 32 seeds' sound unchanged */
+    if (x[1]) {
+        t->p[P_LRATE] = x[2], t->p[P_LWAVE] = x[3], t->p[P_LFADE] = x[4], t->p[P_LTRIG] = 1;
+    }
+    t->p[P_LD_PIT] = x[5];
+    t->p[P_LD_FLT] = x[6];
+    t->p[P_FM4_DEC] = x[7];                        /* the octave switch (retired DIGITAL operator 4's DEC, no page) */
 }
 
 static const engine_t ENG_DRIFT = {

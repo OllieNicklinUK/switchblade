@@ -24,12 +24,12 @@ MACHINES = ["OBX", "WAVE", "ACID", "DRIFT", "JPZ", "CZZ", "GWZ", "MICRO"]   # en
 CAT_ORDER = ["BASS", "LEAD", "KEYS", "BRASS", "STRINGS", "ATMOS", "ACID"]     # category.c: CAT_NONE = 0, then these
 CATS = {                                                         # per machine: category -> count (in this order)
     "OBX": {"BRASS": 8, "STRINGS": 8, "KEYS": 8, "LEAD": 8},
-    "WAVE": {"ATMOS": 10, "LEAD": 12, "KEYS": 14, "BASS": 14},           # V2 (2026-11-19): all 50 from the V2 plugin (tools/wave_v2_presets.py)
+    "WAVE": {"ATMOS": 10, "LEAD": 12, "KEYS": 10, "BASS": 18},           # V2 (2026-11-19): all 50 from the V2 plugin (tools/wave_v2_presets.py)
     "ACID": {"ACID": 2, "BASS": 12, "LEAD": 5, "KEYS": 7, "ATMOS": 6},      # NANO (2026-10-21): the 303's 2, then the SUB model's 30 (fm1_subsynth_presets.h)
-    "DRIFT": {"BASS": 12, "LEAD": 10, "KEYS": 10},
+    "DRIFT": {"BASS": 12, "LEAD": 18, "KEYS": 20},                     # 2026-11-19: 32 seeds + 18 from the Ultramaster KR-106's factory banks
     # the V2 machines (2026-11-17-eight-machines.md, section 8): all 50 count
-    "JPZ": {"LEAD": 16, "ATMOS": 14, "KEYS": 12, "BASS": 8},
-    "CZZ": {"KEYS": 14, "BASS": 12, "LEAD": 12, "ATMOS": 12},
+    "JPZ": {"LEAD": 22, "ATMOS": 17, "KEYS": 3, "BASS": 8},             # 2026-11-19: Alan Marcero's JP-8000 bank (tools/jpz_alan_presets.py)
+    "CZZ": {"KEYS": 22, "LEAD": 13, "ATMOS": 11, "BASS": 4},             # 2026-11-19: the Casio CZ-230S's tones (tools/czz_cz230s_presets.py)
     "GWZ": {"KEYS": 22, "ATMOS": 12, "LEAD": 10, "BASS": 6},
     "MICRO": {"ATMOS": 18, "KEYS": 12, "LEAD": 10, "BASS": 10},
 }
@@ -59,11 +59,29 @@ CZ_DCW_DEF = dict(r=[92, 55, 45, 0, 0, 0, 0, 0], l=[99, 60, 0, 0, 0, 0, 0, 0], s
 def cz_px(p):
     d = p.get("dcw", CZ_DCW_DEF)
     sus = d.get("sus")
-    return list(d["r"]) + list(d["l"]) + [8 if sus is None else sus, d["end"], p.get("oct2", 0) + 2]
+    iv = 64 + p["iv2"] if "iv2" in p else p.get("oct2", 0) + 2      # iv2: line 2's interval in semitones (eng_cz.c: 64 + it)
+    return list(d["r"]) + list(d["l"]) + [8 if sus is None else sus, d["end"], iv]
+
+
+# JP-Z (eng_jpz.c jpz_track_loaded): the JP extras of Alan Marcero's patches (presets/four/jpz.py px; absent = all off)
+JPZ_KEYS = ["ftype", "fe", "penv", "osc2", "fine", "shift", "lvl", "lfo", "ld", "glide", "mx"]
+JPZ_LEN = dict(fe=5, penv=4, osc2=2, lfo=5, ld=3, mx=12)
+JPZ_DEF = dict(ftype=0, fe=[0, 0, 64, 127, 64], penv=[0, 0, 0, 127], osc2=[0, 0], fine=0, shift=0, lvl=0, lfo=[0, 0, 0, 0, 0],
+               ld=[0, 0, 0], glide=0, mx=[0] * 12)
+
+
+def jpz_px(p):
+    x = p.get("px", {})
+    out = []
+    for k in JPZ_KEYS:
+        v = x.get(k, JPZ_DEF[k])
+        out += list(v) if isinstance(v, (list, tuple)) else [v]
+    return out
 
 
 GW_MODELS = {"ORGAN": 0, "VOX": 1, "ADD": 2}                      # GW-Z (eng_gwz.c gw_track_loaded): model, then ORGAN's click
-DRIFT_CHOR = (0, 3)                                              # DRIFT's chor: the Juno chorus, 0 OFF, 1 I, 2 II, 3 I+II (absent = 0)
+DRIFT_CHOR = (0, 3)
+DRIFT_LX_DEF = [0, 0, 0, 0, 0, 0, 0, 0]                           # DRIFT_LX (eng_drift.c): HPF TYPE, LFO {set, RATE, WAVE, FADE}, LFO DEST PIT, FLT, octave                                              # DRIFT's chor: the Juno chorus, 0 OFF, 1 I, 2 II, 3 I+II (absent = 0)
 
 
 def placeholder(src, first):
@@ -170,7 +188,7 @@ def validate(m, pr, rng, errs):
         errs.append(f"{m}: {len(pr)} presets, need {N}")
     count = {}
     names = set()
-    if m in ("OBX", "ACID", "DRIFT") and (any(p.get("ph") for p in pr[:N_OLD]) or
+    if m in ("OBX", "ACID") and (any(p.get("ph") for p in pr[:N_OLD]) or
                                                    not all(p.get("ph") for p in pr[N_OLD:])):
         errs.append(f"{m}: presets 0..{N_OLD - 1} must be the shipped ones and {N_OLD}..{N - 1} placeholders "
                     "(Phase 5 replaces them: then drop this check)")
@@ -210,10 +228,26 @@ def validate(m, pr, rng, errs):
             check_range(errs, who, f"fx[{i}]", v, 0, 126)
         if m == "DRIFT":
             check_range(errs, who, "chor", p.get("chor", 0), *DRIFT_CHOR)
+            lx = p.get("lx", DRIFT_LX_DEF)
+            if len(lx) != 8:
+                errs.append(f"{who}: lx needs 8 values")
+            for i, x in enumerate(lx[:8]):
+                check_range(errs, who, f"lx[{i}]", x, -64 if i in (5, 6) else 0, 3 if i == 0 else 5 if i == 7 else 127)
         if m == "GWZ":
             if p.get("model", "ORGAN") not in GW_MODELS:
                 errs.append(f"{who}: model is one of {', '.join(GW_MODELS)}")
             check_range(errs, who, "click", p.get("click", 0), 0, 127)
+        if m == "JPZ":
+            x = p.get("px", {})
+            for k, v in x.items():
+                if k not in JPZ_DEF:
+                    errs.append(f"{who}: px key {k!r} unknown")
+                    continue
+                vals = list(v) if isinstance(v, (list, tuple)) else [v]
+                if len(vals) != JPZ_LEN.get(k, 1):
+                    errs.append(f"{who}: px {k} needs {JPZ_LEN.get(k, 1)} values")
+                for i, y in enumerate(vals):
+                    check_range(errs, who, f"px {k}[{i}]", y, -64, 127)
         if m == "CZZ":
             d = p.get("dcw", CZ_DCW_DEF)
             if len(d.get("r", ())) != 8 or len(d.get("l", ())) != 8:
@@ -226,6 +260,13 @@ def validate(m, pr, rng, errs):
                 if d["sus"] > d.get("end", 0):
                     errs.append(f"{who}: dcw sus after end")
             check_range(errs, who, "oct2", p.get("oct2", 0), -2, 2)
+            if "iv2" in p:
+                check_range(errs, who, "iv2", p["iv2"], -48, 48)
+            lx = p.get("lx", [0, 0, 0, 0, 0])
+            if len(lx) != 5:
+                errs.append(f"{who}: lx needs 5 values")
+            for i, x in enumerate(lx[:5]):
+                check_range(errs, who, f"lx[{i}]", x, 0, 127)
         if m == "ACID":
             check_range(errs, who, "model", p.get("model", 0), *NANO_MODEL)
             check_range(errs, who, "ftype", p.get("ftype", 0), *NANO_FTYPE)
@@ -299,6 +340,10 @@ def main():
     H += ["static const uint8_t DRIFT_PX[] = {"]
     H += [f'    {p.get("chor", 0)},   /* {p["name"]} */' for p in sets["DRIFT"]]
     H.append("};")
+    H += ["static const int8_t DRIFT_LX[][8] = {   /* DRIFT (eng_drift.c drift_track_loaded): HPF (P_FTYPE), LFO {set, RATE, WAVE, FADE},",
+          "    * LFO DEST PIT, FLT, the octave (0 none, else - 3) (the KR-106 presets'; 0 = the defaults) */"]
+    H += [f'    {{{", ".join(str(v) for v in p.get("lx", DRIFT_LX_DEF))}}},   /* {p["name"]} */' for p in sets["DRIFT"]]
+    H.append("};")
     H += [f"static const uint8_t NANO_PX[][{len(NANO_KEYS)}] = {{   /* NANO (eng_acid.c acid_track_loaded; eng_sub.c NPX_*): model (0 the 303, 1 SUB), then SUB's",
           "    * TYPE, mono, glide, filter ADSR, key track, osc 1 level, osc 2 wave, semitones, PWM, velocity, LFO rate / pitch / cutoff, volume */"]
     H += [f'    {{{", ".join(str(p.get(k, 0)) for k in NANO_KEYS)}}},   /* {p["name"]} */' for p in sets["ACID"]]
@@ -306,9 +351,17 @@ def main():
     H += ["static const uint8_t GW_PX[][2] = {   /* GW-Z (eng_gwz.c gw_track_loaded): model (0 ORGAN 1 VOX 2 ADD), ORGAN's click */"]
     H += [f'    {{{GW_MODELS[p.get("model", "ORGAN")]}, {p.get("click", 0)}}},   /* {p["name"]} */' for p in sets["GWZ"]]
     H.append("};")
+    H += [f"static const int16_t JPZ_PX[][{len(jpz_px({}))}] = {{   /* JP-Z (eng_jpz.c jpz_track_loaded): TYPE, FLT ENV {{LVL A D S R}}, PENV {{depth, A, D, dest}},",
+          "    * OSC2 {wave, PW}, OSC2 FINE, SHIFT, AMP LEVEL, LFO {set, RATE, WAVE, TRIG, FADE}, LFO DEST PIT FLT AMP, GLIDE, matrix x 4 */"]
+    H += [f'    {{{", ".join(str(v) for v in jpz_px(p))}}},   /* {p["name"]} */' for p in sets["JPZ"]]
+    H.append("};")
     H += ["static const uint8_t CZ_PX[][19] = {   /* CZ-Z (eng_cz.c cz_track_loaded): the 8-step DCW envelope: 8 rates, 8 levels,",
           "    * SUS step (8 none), END step; then line 2's octave + 2 */"]
     H += [f'    {{{", ".join(str(v) for v in cz_px(p))}}},   /* {p["name"]} */' for p in sets["CZZ"]]
+    H.append("};")
+    H += ["static const uint8_t CZ_LX[][5] = {   /* CZ-Z (eng_cz.c cz_track_loaded): the CZ's vibrato as the track LFO: set, RATE, WAVE, FADE,",
+          "    * LFO DEST PIT (0 = the defaults) */"]
+    H += [f'    {{{", ".join(str(v) for v in p.get("lx", [0, 0, 0, 0, 0]))}}},   /* {p["name"]} */' for p in sets["CZZ"]]
     H.append("};")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(H) + "\n")

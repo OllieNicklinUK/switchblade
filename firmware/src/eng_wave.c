@@ -101,6 +101,8 @@ _Static_assert(NELEM(VOID_SOFT) == 257, "VOID_CLIP_MAX: VOID_SOFT's length");
 #define VOID_PENV_A 44           /* PENV: its attack, 1 ms in samples (V2 pitchenv_attack of every preset that uses it) */
 #define VOID_PENV_D 2205         /* its decay, V2's fixed 50 ms */
 #define VOID_FENV_K 229          /* FLT ENV (V2): 4 octaves of cutoff steps (127 / log2(16000 / 30) a one) per 63 of ENV DEST FLT, Q8 */
+#define VOID_POST 203             /* the level after the clipper, Q5: x 6.34 = +6 dB (Felucca's) + 4 dB (the user, 2026-11-19: WAVE sat
+                                  * 4 dB under the library's -14.1 dBFS median with V2's levels). The clipper and the filter are as they were */
 #define VOID_XG 228              /* SUB / NOISE: Q14 per step, 127 = the plugin's 1.0 in WAVE's oscillator units (1 / 0.5657, VOID_OUT_LEVEL) */
 
 typedef struct {                 /* per voice (engine memory) */
@@ -596,8 +598,8 @@ VOID_INLINE void void_block(const void_blk_t *b, voice_t *v, void_vc_t *c, int32
          * about 0, as the plugin's does. The plugin's level is ~6 dB below Felucca's other engines, made up
          * after the clipper (which stays at the plugin's level) */
         y = void_clip(void_dc_raw(&dcw, mulq15(clamp(y, -110000, 110000), VOID_OUT_LEVEL)));
-        out[i] += mulq15(mulq15(y, amp >> CTL_LOG2), VOICE_FS) << 2;   /* voice_amp; +6 dB after the clipper: */
-        amp += damp;                                   /* Felucca's engines' level */
+        out[i] += (mulq15(mulq15(y, amp >> CTL_LOG2), VOICE_FS) * VOID_POST) >> 5;   /* voice_amp; +6 dB after the clipper (Felucca's */
+        amp += damp;                                   /* engines' level), and since 2026-11-19 +4 dB more: VOID_POST */
     }
     v->ph[0] = ph1;
     c->ramp = ramp;

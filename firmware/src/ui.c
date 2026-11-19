@@ -428,7 +428,8 @@ static int page_visible(uint32_t i)
     if (PAGES[i].graph == GR_BIG)                     /* V2: EDIT's big cards are HOME's knob panel (ui_rack.c) */
         return 0;
     if (PAGES[i].id[0] == P_FM1_ATK)                  /* FLT ENV: WAVE's filter envelope, NANO's SUB model's (2026-10-21) */
-        return TSEL->eng_req % NENGINES == ENGI_WAVE || (TSEL->eng_req % NENGINES == ENGI_ACID && sub_on(TSEL));
+        return TSEL->eng_req % NENGINES == ENGI_WAVE || TSEL->eng_req % NENGINES == ENGI_JPZ ||   /* (JP-Z: the JP's filter envelope) */
+               (TSEL->eng_req % NENGINES == ENGI_ACID && sub_on(TSEL));
     if (PAGES[i].id[0] == P_FM2_ATK)                  /* NOISE (V2): WAVE's noise */
         return TSEL->eng_req % NENGINES == ENGI_WAVE;
     if (PAGES[i].id[0] == P_RSV_LN)                   /* JUNO (Task 6.2): DRIFT's chorus */
@@ -1230,6 +1231,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     acid_track_loaded(t);                             /* NANO: its model (303 / SUB) and filter TYPE */
     cz_track_loaded(t);                               /* CZ-Z: its 8-step DCW envelope, line 2's octave */
     gw_track_loaded(t);                               /* GW-Z: its model (ORGAN VOX ADD), ORGAN's click */
+    jpz_track_loaded(t);                              /* JP-Z: the JP extras of Alan Marcero's patches (JPZ_PX) */
     load_end(t);
 }
 

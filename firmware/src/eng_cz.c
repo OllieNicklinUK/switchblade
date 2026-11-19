@@ -27,7 +27,7 @@
 #include "cz_core.h"                  /* the chip: cz_wave, cz_dcw_limit, CZ_WV (and cz_tables.h) */
 
 /* ---- the 8-step DCW envelope (Switch Blade's, after the CZ panel) in the part's FM1..FM4 slots ---- */
-#define CZ_ENV P_FM1_ATK                 /* + 0..7 rates, 8..15 levels (0..99), 16 SUS step (8 none), 17 END, 18 oct2 + 2 */
+#define CZ_ENV P_FM1_ATK                 /* + 0..7 rates, 8..15 levels (0..99), 16 SUS step (8 none), 17 END, 18 oct2 + 2 (or 64 + semitones) */
 #define CZ_ENV_OK (CZ_ENV + 19)          /* 1: the slots hold a CZ envelope (cz_track_loaded); else the default below */
 typedef char cz_env_fits[CZ_ENV_OK == P_FM4_LEVEL ? 1 : -1];
 static const uint8_t CZ_ENV_DEF[18] = {92, 55, 45, 0, 0, 0, 0, 0,   99, 60, 0, 0, 0, 0, 0, 0,   1, 2};
@@ -78,15 +78,16 @@ static void cz_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     const int16_t *p = t->p;
     uint32_t mode = (uint32_t)clamp(p[P_E2], 0, 3), md = (uint32_t)clamp(p[P_E6], 0, 2), i;
     uint32_t wa = CZ_WV[clamp(p[P_E0], 0, 7)], wb = CZ_WV[clamp(mode == 2u ? p[P_E0] : p[P_E1], 0, 7)];
-    int32_t oct2 = p[CZ_ENV_OK] == 1 ? clamp(p[CZ_ENV + 18], 0, 4) - 2 : 0;
+    /* line 2's interval: slot 18 = oct2 + 2 (0..4, octaves), or (2026-11-19, the CZ-230S tones' detune) 64 + semitones (16..112) */
+    int32_t i2 = p[CZ_ENV_OK] == 1 ? (p[CZ_ENV + 18] <= 4 ? (clamp(p[CZ_ENV + 18], 0, 4) - 2) * 12 : clamp(p[CZ_ENV + 18], 16, 112) - 64) : 0;
     int32_t f = m->fine + p[P_E3] * 237 / 100;   /* DTN: cents as voice.c's 1/4096 ratio (~2.37 a cent) */
-    uint32_t ib = pitch_inc(clamp(m->pitch16 + oct2 * 192, 0, 2047)), sa = m->inc >> 1, sb, sbn, la, lb, lbn;
+    uint32_t ib = pitch_inc(clamp(m->pitch16 + i2 * 16, 0, 2047)), sa = m->inc >> 1, sb, sbn, la, lb, lbn;
     int32_t dcw, prev, acc, dstep, add, key;
     uint32_t pa = v->ph[0], pb = v->ph[1], cnt = (uint32_t)v->s[5], rnd = (uint32_t)v->s[3];
     int32_t x1 = v->s[6], y1 = v->s[7];  /* the DC blocker (CZ_DC) */
     ib += (uint32_t)((int32_t)(ib >> 12) * f);
     sb = ib >> 1;
-    sbn = md == 2u ? (pitch_inc(clamp(m->pitch16 + oct2 * 192 + 32 * 16, 0, 2047)) >> 1) : sb;   /* NOISE: 32 up */
+    sbn = md == 2u ? (pitch_inc(clamp(m->pitch16 + i2 * 16 + 32 * 16, 0, 2047)) >> 1) : sb;   /* NOISE: 32 up */
     if (mode == 1u) {                    /* LINE 2 alone: line 2's waveform, pitch, DTN and phase */
         wa = wb;
         sa = sb;
@@ -159,6 +160,11 @@ static void cz_track_loaded(track_t *t)
     for (k = 0; k < 19u; k++)
         t->p[CZ_ENV + k] = CZ_PX[t->preset][k];
     t->p[CZ_ENV_OK] = 1;
+    if (CZ_LX[t->preset][0]) {                         /* (2026-11-19) a CZ-230S tone's vibrato: the track LFO on the pitch */
+        t->p[P_LRATE] = CZ_LX[t->preset][1], t->p[P_LWAVE] = CZ_LX[t->preset][2], t->p[P_LFADE] = CZ_LX[t->preset][3];
+        t->p[P_LTRIG] = 1;
+        t->p[P_LD_PIT] = CZ_LX[t->preset][4];
+    }
 }
 
 static const char *const N_CZ_WAVE[] = {"SAW", "SQR", "PULS", "DSIN", "SAWP", "RES1", "RES2", "RES3"};

@@ -80,10 +80,6 @@ PICK = [
     ("PLUCK/Psy_Dart.vwpreset", "KEYS", "PSY DART", 3),
     ("PLUCK/Psy_Rubber.vwpreset", "KEYS", "PSY RUBBER", 3),
     ("PLUCK/Trance_138.vwpreset", "KEYS", "TRANCE 138", 3),
-    ("STAB/Acid_Stab.vwpreset", "KEYS", "ACID STAB", 6),
-    ("STAB/Rave_Hoover_Stab.vwpreset", "KEYS", "RAVE HOOVER", 6),
-    ("STAB/Reese_Stab.vwpreset", "KEYS", "REESE STAB", 6),
-    ("STAB/Supersaw_Stab.vwpreset", "KEYS", "SUPRSAW STAB", 6),
     ("BASS/Acid_Deep.vwpreset", "BASS", "ACID DEEP", 1),
     ("BASS/Acid_House.vwpreset", "BASS", "ACID HOUSE", 1),
     ("BASS/Acid_Slo.vwpreset", "BASS", "ACID SLO", 1),
@@ -98,6 +94,11 @@ PICK = [
     ("BASS/Reese_Darkside.vwpreset", "BASS", "REESE DRKSD", 2),
     ("BASS/Reese_Deep.vwpreset", "BASS", "REESE DEEP", 2),
     ("BASS/Reese_DnB.vwpreset", "BASS", "REESE DNB", 2),
+    # 2026-11-19, the user: the four stabs swapped for more basses
+    ("BASS/Acid_Techno.vwpreset", "BASS", "ACID TECHNO", 1),
+    ("BASS/Sub_Saw_Layer.vwpreset", "BASS", "SUB SAW LAYR", 2),
+    ("BASS/Sub_Stab_Tek.vwpreset", "BASS", "SUB STAB TEK", 2),
+    ("BASS/Reese_Wobble.vwpreset", "BASS", "REESE WOBBLE", 2),
 ]
 FXD = dict(ATMOS=(0, 30, 30, 60), LEAD=(0, 10, 35, 25), KEYS=(0, 10, 25, 30), BASS=(0, 0, 0, 0))   # WAVE's category sends
 

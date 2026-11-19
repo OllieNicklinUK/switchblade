@@ -39,25 +39,25 @@ oversampling), V2's pitch envelope, sub oscillator and noise. Per preset: what t
 | 30 | PSY DART | Psy Dart (PLUCK) | KEYS | dry in the plugin: WAVE's category sends | - |
 | 31 | PSY RUBBER | Psy Rubber (PLUCK) | KEYS | dry in the plugin: WAVE's category sends | - |
 | 32 | TRANCE 138 | Trance 138 (PLUCK) | KEYS | dry in the plugin: WAVE's category sends | - |
-| 33 | ACID STAB | Acid Stab (STAB) | KEYS | VEL -> ENV1 depth as FLT ENV's velocity; macro / CC slot 1 (0 in the plugin); macro / CC slot 2 (0 in the plugin); macro / CC slot 3 (0 in the plugin); dry in the plugin: WAVE's category sends | - |
-| 34 | RAVE HOOVER | Rave Hoover Stab (STAB) | KEYS | OSC2 a copy 6 cents off: unison; dry in the plugin: WAVE's category sends | unison 4 / detune (poly: WAVE's SPREAD pans the voices, it does not detune them) |
-| 35 | REESE STAB | Reese Stab (STAB) | KEYS | OSC2 a copy 14 cents off: unison; macro / CC slot 1 (0 in the plugin); macro / CC slot 2 (0 in the plugin); dry in the plugin: WAVE's category sends | unison 2 / detune (poly: WAVE's SPREAD pans the voices, it does not detune them) |
-| 36 | SUPRSAW STAB | Supersaw Stab (STAB) | KEYS | OSC2 a copy 5 cents off: unison; macro / CC slot 1 (0 in the plugin); macro / CC slot 2 (0 in the plugin); dry in the plugin: WAVE's category sends | unison 6 / detune (poly: WAVE's SPREAD pans the voices, it does not detune them) |
-| 37 | ACID DEEP | Acid Deep (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
-| 38 | ACID HOUSE | Acid House (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
-| 39 | ACID SLO | Acid Slo (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
-| 40 | ACID SPIKE | Acid Spike (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
-| 41 | ACID SQUELCH | Acid Squelch (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
-| 42 | SUB KICK | Sub Kick (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
-| 43 | SUB NZ PUNCH | Sub Noise Punch (BASS) | BASS | dry in the plugin: WAVE's category sends | matrix slot 6: source 5 -> destination 35 |
-| 44 | SUB ROLL | Sub Roll (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
-| 45 | PLUCK BASS | Pluck Bass (BASS) | BASS | macro / CC slot 1 (0 in the plugin); macro / CC slot 2 (0 in the plugin); dry in the plugin: WAVE's category sends | matrix slot 5: source 5 -> destination 30 |
-| 46 | HOOVER CLSC | Hoover Classic (BASS) | BASS | OSC2 a copy 5 cents off: unison; PENV -36 st stored, V2 plays +-24; poly in the plugin: MONO for UNISON; unison 4 -> UNISON; dry in the plugin: WAVE's category sends | unison detune +-80 cents (WAVE's at most +-40) |
-| 47 | HOOVER HARD | Hoover Hard (BASS) | BASS | OSC2 a copy 7 cents off: unison; PENV -48 st stored, V2 plays +-24; poly in the plugin: MONO for UNISON; unison 6 -> UNISON; dry in the plugin: WAVE's category sends | unison detune +-90 cents (WAVE's at most +-40) |
-| 48 | REESE DRKSD | Reese Darkside (BASS) | BASS | OSC2 a copy 11 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
-| 49 | REESE DEEP | Reese Deep (BASS) | BASS | OSC2 a copy 15 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
-| 50 | REESE DNB | Reese DnB (BASS) | BASS | OSC2 a copy 10 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
+| 33 | ACID DEEP | Acid Deep (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 34 | ACID HOUSE | Acid House (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 35 | ACID SLO | Acid Slo (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 36 | ACID SPIKE | Acid Spike (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 37 | ACID SQUELCH | Acid Squelch (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 38 | SUB KICK | Sub Kick (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
+| 39 | SUB NZ PUNCH | Sub Noise Punch (BASS) | BASS | dry in the plugin: WAVE's category sends | matrix slot 6: source 5 -> destination 35 |
+| 40 | SUB ROLL | Sub Roll (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
+| 41 | PLUCK BASS | Pluck Bass (BASS) | BASS | macro / CC slot 1 (0 in the plugin); macro / CC slot 2 (0 in the plugin); dry in the plugin: WAVE's category sends | matrix slot 5: source 5 -> destination 30 |
+| 42 | HOOVER CLSC | Hoover Classic (BASS) | BASS | OSC2 a copy 5 cents off: unison; PENV -36 st stored, V2 plays +-24; poly in the plugin: MONO for UNISON; unison 4 -> UNISON; dry in the plugin: WAVE's category sends | unison detune +-80 cents (WAVE's at most +-40) |
+| 43 | HOOVER HARD | Hoover Hard (BASS) | BASS | OSC2 a copy 7 cents off: unison; PENV -48 st stored, V2 plays +-24; poly in the plugin: MONO for UNISON; unison 6 -> UNISON; dry in the plugin: WAVE's category sends | unison detune +-90 cents (WAVE's at most +-40) |
+| 44 | REESE DRKSD | Reese Darkside (BASS) | BASS | OSC2 a copy 11 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
+| 45 | REESE DEEP | Reese Deep (BASS) | BASS | OSC2 a copy 15 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
+| 46 | REESE DNB | Reese DnB (BASS) | BASS | OSC2 a copy 10 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
+| 47 | ACID TECHNO | Acid Techno (BASS) | BASS | VEL -> ENV1 depth as FLT ENV's velocity; dry in the plugin: WAVE's category sends | - |
+| 48 | SUB SAW LAYR | Sub Saw Layer (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
+| 49 | SUB STAB TEK | Sub Stab Tek (BASS) | BASS | dry in the plugin: WAVE's category sends | - |
+| 50 | REESE WOBBLE | Reese Wobble (BASS) | BASS | OSC2 a copy 12 cents off: unison; poly in the plugin: MONO for UNISON; unison 2 -> UNISON; dry in the plugin: WAVE's category sends | - |
 
-50 presets, 31 with nothing lost.
+50 presets, 34 with nothing lost.
 
 The bank this replaces (2026-10-20: 32 originals, ATMOS 8 LEAD 10 BASS 14, and 18 SLOT placeholders) is in git history.
