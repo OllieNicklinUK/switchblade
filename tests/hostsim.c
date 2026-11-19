@@ -116,6 +116,7 @@ static void host_preset_values(track_t *t, uint32_t e, uint32_t pi, const preset
     acid_track_loaded(t);                         /* NANO's model and filter TYPE (NANO_PX), as ui.c apply_preset_to */
     cz_track_loaded(t);                           /* CZ-Z's DCW envelope and oct2 (CZ_PX), as ui.c apply_preset_to */
     gw_track_loaded(t);                           /* GW-Z's model and click (GW_PX), as ui.c apply_preset_to */
+    jpz_track_loaded(t);                          /* JP-Z's JP extras (JPZ_PX: Alan Marcero's bank), as ui.c apply_preset_to */
 }
 static void host_preset_req(track_t *t, uint32_t e, uint32_t pi)
 {

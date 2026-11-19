@@ -408,9 +408,11 @@ static void test_v2_parts(void)
  * shaper (eng_wave.c void_front), so every scenario's samples moved; the recording is of the V2 tree, the fast loops and the forced slow
  * loop agreeing (the check below). Before: 89c9d66272840c8a 723981c818e6fee8 b82f2a46533caa75 d106dfad484512cc 1695f2cbd027b44d
  * 4f6e5c2300649526 c119b16700c137c2 (Task 4.5) */
-static const uint64_t SCEN_HASH[7] = {0x67dcdd12766dd0d6ull, 0x4a9bcf43ed0f6d71ull, 0xece1394f744cddfbull, 0x94b33c081a22e1b0ull,
-                                      0x9d9bf361e21afed6ull, 0x9e74bfe4ef5a3cecull,
-                                      0x8396582a14330244ull};   /* LP24 BP HP LP12 HP24 NOTCH, VOWEL */
+/* (re-recorded again the same day: WAVE +4 dB after the clipper, VOID_POST; before it 67dcdd12766dd0d6 4a9bcf43ed0f6d71 ece1394f744cddfb
+ * 94b33c081a22e1b0 9d9bf361e21afed6 9e74bfe4ef5a3cec 8396582a14330244) */
+static const uint64_t SCEN_HASH[7] = {0x5568f49390689a12ull, 0x65480021a7602fa5ull, 0x3a9030955ad7efb7ull, 0x66cdede8989ad41bull,
+                                      0x7d2ec287852cd1e9ull, 0x790a01b7202bd724ull,
+                                      0x8ce2c16c9add4740ull};   /* LP24 BP HP LP12 HP24 NOTCH, VOWEL */
 static uint64_t scen_hash(uint32_t ft)
 {
     static const uint8_t TB[3] = {1, 2, 3}, N[4] = {36, 43, 60, 84}, CUT[4] = {0, 1, 64, 127}, RES[3] = {0, 64, 127};
@@ -986,11 +988,13 @@ static void test_vowel_bounded(void)
     pkl = bounded_run(VF_LP24, &wl, &dcl);
     /* a 2-voice chord peaks at pkv; the mixer takes b (the part's sum, 32768 per full scale) as x = ((b >> 2) * 9713) >> 10 at LEVEL 127 and needs
      * x * 4096 < 2^31 (x <= 524287); a WAVE part plays 6 voices, so 3 x this chord */
-    snprintf(msg, sizeof msg, "VOWEL, RES 127 + DRV 127, MIDI 24..99: no wrapped sample, DC under 2 %% of the rms (%.3f %%), peak %.0f (LP24: %.0f; x at LEVEL 127 for 6 voices %.0f of 524287)",
+    snprintf(msg, sizeof msg, "VOWEL, RES 127 + DRV 127, MIDI 24..99: no wrapped sample, DC under 2.5 %% of the rms (%.3f %%), peak %.0f (LP24: %.0f; x at LEVEL 127 for 6 voices %.0f of 524287)",
              dcv * 100, pkv, pkl, pkv * 3 * 9713 / 4096.0);
     /* (V2: 2 %. V2's shaper folds asymmetrically (its even harmonics), and the voice's soft clipper, symmetric, turns a little of that into DC
-     * after the blocker: 1.6 .. 1.8 % here, -36 dB; the plugin's voice does the same. It was under 1 % with V1's shaper.) */
-    check(msg, wv == 0 && dcv < 0.02 && pkv < 1.15 * pkl + 1 && pkv * 3 * 9713 / 4096.0 < 524287.0);
+     * after the blocker: 1.6 .. 1.8 % here, -36 dB; the plugin's voice does the same. It was under 1 % with V1's shaper. 2.5 % since
+     * WAVE's +4 dB (VOID_POST): this corner (RES and DRV 127, a 2-note chord at LEVEL 127) now reaches the master's limiter, which adds
+     * its own share: 2.06 % measured, -34 dB) */
+    check(msg, wv == 0 && dcv < 0.025 && pkv < 1.15 * pkl + 1 && pkv * 3 * 9713 / 4096.0 < 524287.0);
 }
 
 /* the post-filter chain (clamp 110000, VOID_OUT_LEVEL, DC blocker, void_clip) is the one every filter shares: a voice's peak is VOID_CLIP_THR +

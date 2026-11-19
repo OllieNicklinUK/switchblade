@@ -14,6 +14,31 @@ static void check(const char *what, int ok)
     bad += !ok;
 }
 
+/* The scenarios below were written on preset 0 when it was the first voicing's TRANCE LEAD. Since 2026-11-19 the bank is
+ * Alan Marcero's (with JP extras: JPZ_PX), so a scenario's preset 0 is put back to that sound, its extras off: they measure
+ * what they always did. Every preset is still played as itself where the test loops over all of them. */
+static void jpz_old0(track_t *t)
+{
+    static const int16_t E[8] = {70, 100, -64, 0, 96, 20, 64, 100};
+    static const uint8_t ENV[4] = {0, 70, 110, 40}, FXS[4] = {0, 0, 30, 26};
+    uint32_t i;
+    for (i = 0; i < P_E0; i++)
+        if (!param_kept(i))
+            t->p[i] = TP[i].def;
+    for (i = 0; i < 8u; i++)
+        t->p[P_E0 + i] = E[i];
+    t->p[P_ATK] = ENV[0], t->p[P_DEC] = ENV[1], t->p[P_SUS] = ENV[2], t->p[P_REL] = ENV[3];
+    t->p[P_ED_FLT] = 10;
+    t->p[P_VOICE] = V_LEGATO;
+    for (i = 0; i < 4u; i++)
+        t->p[P_DIST + i] = FXS[i];
+}
+static void host_preset0(void)
+{
+    host_preset(&trk[0], ENGI_JPZ, 0);
+    jpz_old0(&trk[0]);
+}
+
 #define NB 300u
 typedef struct { double rms, bright, side, peak, zc; } meas_t;
 static int32_t L[NB * CTL], R[NB * CTL];
@@ -34,7 +59,9 @@ static meas_t play(uint32_t pi, const int16_t *e, int ftype, uint32_t note)
     double s = 0, d = 0, w = 0;
     fresh();
     host_preset(&trk[0], ENGI_JPZ, pi);
-    jpz_mem(&trk[0])->seeded = 0;          /* (the same seven phases every play: how they line up makes the sound, so
+    if (!pi)
+        jpz_old0(&trk[0]);                 /* (preset 0 as the scenarios were written) */
+    jpz_mem(&trk[0])->seeded = 0;         /* (the same seven phases every play: how they line up makes the sound, so
                                            * two settings compare only from the same start) */
     trk[0].p[P_LEVEL] = 100;
     trk[0].p[P_DIST] = trk[0].p[P_CHOR] = trk[0].p[P_DLY] = trk[0].p[P_REV] = 0;
@@ -86,7 +113,7 @@ int main(void)
             uint32_t p0[7], q, vi;
             double base, want, got;
             fresh();
-            host_preset(&trk[0], ENGI_JPZ, 0);
+            host_preset0();
             trk[0].p[P_E0] = (int16_t)dt;
             trk[0].p[P_VOICE] = V_POLY;
             trk_note_on(&trk[0], 60, 100);
@@ -124,7 +151,7 @@ int main(void)
         uint32_t j;
         int32_t first[CTL * 4];
         fresh();
-        host_preset(&trk[0], ENGI_JPZ, 0);
+        host_preset0();
         trk[0].p[P_VOICE] = V_LEGATO;
         for (j = 0; j < 2u; j++) {
             trk_note_on(&trk[0], 60, 100);
@@ -151,7 +178,7 @@ int main(void)
         trk_note_on(&trk[0], 60, 100);
         { int32_t o[2 * CTL]; mix_block(o, CTL); }
         trk_note_off(&trk[0], 60);
-        host_preset(&trk[0], ENGI_JPZ, 0);
+        host_preset0();
         mm = jpz_mem(&trk[0]);
         check("  switching to JP-Z zeroes its region (WAVE had it), so it is unseeded", !mm->seeded);
         trk_note_on(&trk[0], 60, 100);
@@ -204,7 +231,7 @@ int main(void)
     {
         uint32_t nv = 0;
         fresh();
-        host_preset(&trk[0], ENGI_JPZ, 0);
+        host_preset0();
         trk[0].p[P_VOICE] = V_UNISON;
         trk_note_on(&trk[0], 60, 100);
         for (i = 0; i < NVOICE; i++) nv += trk[0].v[i].active;

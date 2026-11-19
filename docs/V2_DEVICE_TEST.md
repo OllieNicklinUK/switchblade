@@ -1,12 +1,14 @@
-# V2 device test (build v0.3-v2test5; test1 to test4 also work with this sheet)
+# V2 device test (build v0.3-v2test6; test1 to test5 also work with this sheet)
 
 The first V2 build on a real FM-1. It checks that saving still works on your unit, measures the CPU on the device for
 the first time, and tries the new MIDI. About 30–40 minutes. Note what you see against each step; anything odd is
 worth writing down, even if you are not sure it is a fault.
 
-**The build (use this one):** `build/release-0.3-v2test5/switchblade-0.3-v2test5.fwsc`, identity `FM-1_9403`, version
-`v0.3-v2test5`, SHA-256 `622d0e01…313fded6` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
-have their own voices**. Its installer site is `build\v2test5-site`.
+**The build (use this one):** `build/release-0.3-v2test6/switchblade-0.3-v2test6.fwsc`, identity `FM-1_9403`, version
+`v0.3-v2test6`, SHA-256 `b826fc16…c43669022` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
+have their own voices**. Its installer site is `build\v2test6-site`.
+(test6 is test5 plus new preset banks for JP-Z (Alan Marcero's), JUNO 33-50 (the KR-106's keys and leads) and CZ-Z (the
+CZ-230S's tones), WAVE 4 dB louder with four more basses, section 3c.)
 (test5 is test4 plus WAVE upgraded to the VOID WAVE V2 plugin: 50 new WAVE presets, PENV / SUB / NOISE, section 3b.
 test4, `v0.3-v2test4`, `build\v2test4-site`, has the old WAVE bank.)
 (test4 is test3 plus OCT+ held and the PRESETS knob to switch machine, section 3.)
@@ -38,7 +40,7 @@ machine knob sweeps the wavetable, GRIT on page 2. For CPU (section 4), add mix 
 The command-line installer needs `python-rtmidi`, which is not on this PC, so use the web installer from a local copy:
 
 ```
-cd D:\Switchblade\FM1-Four\build\v2test5-site
+cd D:\Switchblade\FM1-Four\build\v2test6-site
 py -3 -m http.server 8000
 ```
 
@@ -47,7 +49,7 @@ editor tab and any DAW using the FM-1's MIDI port first. Leave the server window
 
 ## 2. Saving (the most important check)
 
-- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test5**.
+- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test6**.
 - [ ] Your 0.2-beta projects and user presets are still there, and load and sound as before.
 - [ ] Change a MENU setting, save a **project** and a **user preset**, switch the FM-1 off and on: all three kept.
 - [ ] Optional: the USB serial console's `status` shows `flash 1` (saving allowed).
@@ -67,11 +69,13 @@ If saving fails: stop, and roll back (section 6). Nothing else matters until thi
 ## 3b. WAVE, from the V2 plugin (test5)
 
 WAVE's 50 presets are now converted from the VOID WAVE **V2** plugin's factory set: ATMOS 1-10, LEAD 11-22, KEYS
-23-36, BASS 37-50. `docs/void_presets.md` lists each one and what it lost. The old 32-preset bank is gone, so a saved
-project that used a WAVE preset by number now loads the new sound in that slot.
+23-32, BASS 33-50 (test6: the four stabs swapped for basses 47-50, and WAVE 4 dB louder). `docs/void_presets.md` lists
+each one and what it lost. The old 32-preset bank is gone, so a saved project that used a WAVE preset by number now
+loads the new sound in that slot.
 
 - [ ] EDIT held, white key 2 (WAVE): presets 1-50 all play. At least try SUPRSAW WARM (1), FORMNT CHOIR (6),
-      ACID SCREECH (12), DEEP HSE KEY (23), RAVE HOOVER (34), SUB KICK (42) and REESE DNB (50).
+      ACID SCREECH (12), DEEP HSE KEY (23), SUB KICK (38), REESE DNB (46) and SUB STAB TEK (49).
+- [ ] (test6) WAVE now sits level with the other machines (it was about 4 dB quieter).
 - [ ] **PENV** (MACHINE 1, 4th knob, -24..+24): SUB KICK and the HOOVERs start with a pitch sweep. On any preset,
       turning it gives a ~50 ms blip at the start of each note and nothing after.
 - [ ] **SUB** (MACHINE 2, 3rd knob): a sine under the note (SUB ROLL, REESE DEEP); turning it up on a bass adds weight.
@@ -82,6 +86,24 @@ project that used a WAVE preset by number now loads the new sound in that slot.
       plugin too). Note any preset that clicks, crackles or sounds broken.
 - [ ] CPU: hold a note of REESE DNB (UNISON takes the part's 6 voices) plus a WAVE pad chord on another part, and read
       MENU > SYSTEM > INFO > CPU.
+
+## 3c. New preset banks: JP-Z, JUNO, CZ-Z (test6)
+
+Each list of what a preset kept and lost is in `docs/jpz_presets.md`, `docs/drift_presets.md` and `docs/czz_presets.md`.
+
+- [ ] **JP-Z** (key 5): all 50 are Alan Marcero's JP-8000 patches (LEAD 1-22, ATMOS 23-39, KEYS 40-42, BASS 43-50).
+      Try CLASSIC TRNC (1), 1999 TRANCE (5), 70S SUPERSAW (6), JP8 BRASS (11), CALMING SAWS (29), WARM BLANKET (38),
+      VAN DYK LIKE (40), SUPER BASS (48), PORTA SPRSAW (50). New: OSC2 pulse / triangle, the JP's own filter envelope
+      (a FLT ENV page on JP-Z now), its pitch envelope (GAS BRASS, JP8 BRASS). The mod wheel brings in vibrato on many.
+- [ ] **JUNO** (key 4): presets 1-32 as before; 33-50 are new, Juno-106 and Juno-60 factory keys and leads from the
+      KR-106: E PIANO I (33), PIANO 60 (35), CLAV I (37), NYLON GUITAR (41), HAMMER LEAD (43), BLIP LEAD (46),
+      SOLO TRUMPET (49). Some have vibrato or the HPF (E PIANO I).
+- [ ] **CZ-Z** (key 6): all 50 are the Casio CZ-230S's tones (LEAD 1-13, ATMOS 14-24, KEYS 25-46, BASS 47-50). Try
+      BRASS ENS 1 (1), STRINGS 1 (15), FEMALE CHOIR (21), JAZZ ORGAN 1 (28), PIANO 1 (32), MARIMBA (44), ELEC BASS 1
+      (47), SLAP BASS (49). Their attack pitch blips are not there (CZ-Z has no pitch envelope); note any that sound
+      wrong without them.
+- [ ] Note any preset on any machine that clicks, crackles, is far louder or quieter than its neighbours, or sounds
+      broken.
 
 ## 4. CPU on the device
 

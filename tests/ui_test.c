@@ -3801,10 +3801,12 @@ static int test_pages_four(void)
     for (e = 0; e < NENGINES; e++) {
         ui_power_on(); set_engine_of(TSEL, e);
         for (i = 0; i < NPAGES; i++)
-            if (str_eq(PAGES[i].title, "FLT ENV") || str_eq(PAGES[i].title, "NOISE"))
+            if (str_eq(PAGES[i].title, "FLT ENV"))
+                ok &= page_visible(i) == (e == ENGI_WAVE || e == ENGI_JPZ);
+            else if (str_eq(PAGES[i].title, "NOISE"))
                 ok &= page_visible(i) == (e == ENGI_WAVE);
     }
-    bad += check("FLT ENV and NOISE for WAVE only", ok);
+    bad += check("FLT ENV for WAVE and JP-Z only, NOISE for WAVE only", ok);
     {   /* the icons by label: each label once, none of a retired engine's controls (ALG, KIT, MODEL, LANE, ..) */
         static const char *const OLD[] = {"ALG", "R2", "IDX", "FB", "CHIP", "DUTY", "KIT", "KICK", "MODEL", "STRC",
                                           "VOWL", "TALK", "MLVL", "MRAT", "LANE", "HIT", "SRC", "START", "DENS", "REG"};
