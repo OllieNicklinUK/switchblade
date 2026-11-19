@@ -18,8 +18,9 @@ The mapping (eng_jpz.c):
               the filter envelope -> FLT ENV (A D S R 1:1; its velocity sensitivity 64 with the patch's VELOCITY on), its
               DEPTH -> ENV DEST FLT
   amp         its envelope -> A D S R; AMP LEVEL; MONO / LEGATO / PORTAMENTO -> mono, GLIDE; OSC SHIFT
-  pitch env   DEPTH (63 = +24 semitones: by ear), A, D, to OSC1+2 or OSC2
-  LFO         LFO1 (wave, rate, fade; its OSC / FILTER / AMP depths -> LFO DEST PIT FLT AMP) when it is used; else LFO2 (the
+  pitch env   DEPTH (63 = +12 semitones: by ear), A, D, to OSC1+2 or OSC2
+  LFO         LFO1 (wave, rate, fade; its OSC / FILTER / AMP depths -> LFO DEST PIT FLT AMP, the pitch's 63 = +-2 semitones:
+              PIT_K) when it is used; else LFO2 (the
               JP's mod-lever LFO: its PITCH depth on LFO DEST PIT, the matrix's MODW -> DEPTH so the wheel brings it in)
   FX          MULTI-FX: SUPER CHORUS -> WID (JP-Z's part chorus I / II / I+II), FLANGER / PHASER -> the CHORUS send,
               DISTORTION -> DIST; DELAY LEVEL -> the DELAY send (its type and time are the FM-1's global delay); REVERB: the
@@ -58,6 +59,9 @@ OSC1 = ["SUPER SAW", "TRI MOD", "NOISE", "FEEDBACK", "SQUARE", "SAW", "TRI"]
 OSC2 = ["PULSE", "TRI", "SAW", "NOISE"]
 LWAVE = {0: 1, 1: 2, 2: 3, 3: 4}                       # the JP's LFO1 TRI SAW SQR S/H -> Felucca's TRI SAW SQR S&H
 MS_MODW, MD_DEPTH = 6, 20                              # mod.c MS_MODW, MD_DEPTH
+# the JP's LFO pitch depth (+-63) as LFO DEST PIT (63 = 11.8 semitones there): 63 = +-2 semitones (by ear: 1:1 made the vibratos of
+# the device test a pitch wobble of up to +-2.8 semitones; the JP's own scale is not measured)
+PIT_K = 2.0 / 11.8
 
 
 def clampi(v, lo, hi):
@@ -130,7 +134,7 @@ def convert(d, cat, name):
     lfo, ld, mx = [0, 0, 0, 0, 0], [0, 0, 0], []
     if any(abs(x) >= 2 for x in l1):
         lfo = [1, g(0x11), LWAVE.get(g(0x10), 1), 1, g(0x12)]
-        ld = [clampi(x, -64, 63) for x in l1]
+        ld = [clampi(l1[0] * PIT_K, -64, 63), clampi(l1[1], -64, 63), clampi(l1[2], -64, 63)]
         if pdest == 1 and abs(l1[0]) >= 2:
             lost.append("LFO1 pitch on OSC2 alone (here both)")
         if pdest == 2:
@@ -139,7 +143,7 @@ def convert(d, cat, name):
             lost.append("LFO2, the mod lever's (JP-Z: one LFO, LFO1 kept)")
     elif any(abs(x) >= 2 for x in l2):
         lfo = [1, g(0x13), 0, 1, 0]
-        ld = [clampi(x, -64, 63) for x in l2]
+        ld = [clampi(l2[0] * PIT_K, -64, 63), clampi(l2[1], -64, 63), clampi(l2[2], -64, 63)]
         mx = [MS_MODW, MD_DEPTH, 63]
         notes.append("LFO2 on the mod wheel")
     # FX

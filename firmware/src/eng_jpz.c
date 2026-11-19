@@ -30,7 +30,7 @@
  *        (the JP's OSC2 CTRL1: 0 = 50 %, 127 = 15 %, unverified: by ear); OSC2 FINE P_FM3_REL (0 none, else - 64 cents);
  *   the JP's filter envelope: FLT ENV (P_FM1_ATK .. P_FM1_REL, on while P_FM1_LEVEL > 0, its velocity sensitivity),
  *        ENV DEST FLT its depth, the amp ADSR then the amp's only (WAVE's arrangement);
- *   the JP's pitch envelope: depth P_FM2_ATK (0 off, else - 64: 63 = +24 semitones), attack P_FM2_REL, decay P_FM2_DEC
+ *   the JP's pitch envelope: depth P_FM2_ATK (0 off, else - 64: 63 = +12 semitones), attack P_FM2_REL, decay P_FM2_DEC
  *        (Felucca's times; up, then back to the pitch), to both oscillators or OSC2 only (P_FM2_SUS < 64);
  *   the JP's OSCILLATOR SHIFT P_FM3_DEC (0 none, else - 3 octaves) and its AMP LEVEL P_FM3_ATK (0 = 127, else x / 127).
  * All of it per control block but OSC2's waveform: one test a sample on OSC2. */
@@ -213,8 +213,8 @@ static void jpz_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
         jpz_seed(mm, (uint32_t)(t - trk));
     {
         int32_t e = jpz_penv(p, v);                    /* (run every block: its state moves whether or not it is on) */
-        if (p[P_FM2_ATK])                              /* the pitch envelope's depth: 63 = +24 semitones, 1/16 semitone */
-            pe = (int32_t)(((int64_t)e * (clamp(p[P_FM2_ATK], 1, 127) - 64) * 384 / 63) >> 15);
+        if (p[P_FM2_ATK])                              /* the pitch envelope's depth: 63 = +12 semitones, 1/16 semitone (by ear: */
+            pe = (int32_t)(((int64_t)e * (clamp(p[P_FM2_ATK], 1, 127) - 64) * 192 / 63) >> 15);   /* +24 was far too wide on the device) */
     }
     pit1 = m->pitch16 + sh + (p[P_FM2_SUS] >= 64 ? pe : 0);
     if (pit1 != m->pitch16)                            /* OSC1: the shift, the pitch envelope when it is on both */
