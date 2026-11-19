@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The VOID WAVE plugin's own filter (VoidWave/Source/DSP/Filter.cpp, built here without JUCE: tools/void_ref/
+// The VOID WAVE V2 plugin's own filter (D:/VOID SYNTH/VoidWave/Source/DSP/Filter.cpp, built here without JUCE: tools/void_ref/
 // JuceHeader.h) on the cases of tests/void_ref_cfg.h: build/void_ref/NN.f32 (float, VOID_REF_N samples each),
 // the reference tests/void_test.c compares eng_void.c's filter against.
-//   c++ -std=c++17 -O2 -Itools/void_ref -I../VoidWave/Source/DSP tools/void_ref.cpp ../VoidWave/Source/DSP/Filter.cpp
+//   c++ -std=c++17 -O2 -Itools/void_ref -I"../../VOID SYNTH/VoidWave/Source/DSP" tools/void_ref.cpp "../../VOID SYNTH/VoidWave/Source/DSP/Filter.cpp"
 //   ./a.out build/void_ref
 #include "Filter.h"
 #include <cmath>

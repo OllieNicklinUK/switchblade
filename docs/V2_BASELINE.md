@@ -110,3 +110,13 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - Image 460,836 B (+17 KB, 16 KB of it the tables; ~120 KB of the app area left). RAM unchanged (45,316 B).
 - Host CPU per voice (heaviest preset, 8 voices, less idle): JUNO ~400 (cap 3), NANO ~510 (cap 1), GW-Z ~250, JP-Z ~240, CZ-Z ~190, MICRO ~180. `worst8` unchanged at 3,861 (JUNO + NANO). Static: `micro_render` 169, no divides.
 - Preset audit, all 400 pass: level medians OB-Z -12.3, WAVE -14.3, NANO -15.2, JUNO -11.8, JP-Z -10.9, CZ-Z -16.9, GW-Z -14.5, MICRO -15.1 dBFS; 72 exact duplicates left, all the SLOT 33..50 placeholders of the four 0.2 machines.
+
+## WAVE from the VOID WAVE V2 plugin (2026-11-19) — the "lean" upgrade, build v0.3-v2test5
+
+- Source: the V2 plugin, `D:/VOID SYNTH/VoidWave` (git e280794); the reference tests now build its `Filter.cpp` (`VOIDWAVE_DIR`, default `../../VOID SYNTH/VoidWave`; `tools/void_ref/JuceHeader.h` gained `SmoothedValue`). Every case matches within 0.06 dB (levels) and 0.55 dB (harmonics), the drive cases included.
+- `tools/gen_void_tables.py`: the frames normalised as V2's `normalize()` (DC out, RMS 0.35, peak at most 0.999); SQUARE's level per width in `VOID_SQ_GAIN`; SPECTRAL's 17 keyframes chosen again; `VOID_NCOL` (the noise colour).
+- `eng_wave.c`: V2's drive shaper (not its 4x oversampling); FLT ENV on V2's law (63 = 4 octaves); PENV in E3 (was the hidden MIX), SUB in E6 (was OSC2), NOISE / COLOR / sub octave in P_FM2_ATK / SUS / DEC (a new NOISE page, WAVE only, after FLT ENV), OLVL (the oscillator's level, a preset's own) in P_FM3_ATK. SUB and NOISE at 0 run the old loops (8 specialised loops now: `void_render` static cost 8,579 -> 26,981, code, not per-sample cost).
+- Presets: all 50 from the V2 factory set, `tools/wave_v2_presets.py` -> `presets/four/wave.py` (generated) and `docs/void_presets.md` (31 with nothing lost). WAVE categories ATMOS 10, LEAD 12, KEYS 14, BASS 14; the N_OLD rule no longer applies to WAVE. The 2026-10-20 bank is in git history.
+- Host CPU: WAVE presets 1,284 .. 2,637 instructions / sample at the 6-voice cap (the old bank 1,436 .. 2,492); the heaviest (SUB ROLL, REESE DEEP: UNISON + SUB) 1.53 x 8 voices of OB-Z RAVE, inside the 1.75 x limit. Image 467,360 B (+6.5 KB on test4); RAM unchanged.
+- Goldens: the 50 WAVE lines replaced, plus the two four-machine mixes (a WAVE part each) and the union_test lines; CPU baseline and target budget: only WAVE's entries. VOWEL's corner DC bound 1 % -> 2 % (V2's asymmetric fold through the symmetric clipper: 1.6-1.8 %).
+- Levels (preset audit): WAVE median -18.4 dBFS (the library's -14.1), spread 26.7 dB, the FORMNT pads the quietest (-35.4): V2's own Phase B levels, carried by OLVL. To set in Phase 5 by ear.

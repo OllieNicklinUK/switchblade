@@ -3,13 +3,17 @@
 """Wavetables of the VOID engine (eng_void.c): the VOID WAVE plugin's built-in tables 0-8.
 
 The plugin (VoidWave/Source/Data/WavetableBank.cpp) builds each table as 256 frames of 2048 float
-samples, every frame peak-normalised; position 0..1 picks the frame (frame = position * 255). Here:
+samples; position 0..1 picks the frame (frame = position * 255). Since the V2 plugin (D:/VOID SYNTH, 2026-07-12,
+f5dead5) every frame is normalised as V2's normalize(): its DC removed, then scaled to an RMS of 0.35, the scale
+cut where the peak would pass 0.999 (V1 peak-normalised to 1.0: the tables are 4-7 dB quieter, each by its own
+amount). The formulas are V1's, unchanged in V2. Here:
   - the same frames, from the same formulas (the Noise table's phases from JUCE's Random, its LCG
     and nextFloat reproduced), but only at KEYS: the frames between are a linear crossfade of the
     two keyframes around them (KEYS chosen with --choose: within KEY_DB of the plugin's frames).
     Two exceptions: SQUARE (a pulse whose width moves: no crossfade of two widths is a width
     between) is one band-limited saw here, the engine's pulse the difference of two readings of
-    it (any width, band-limited; the plugin's pulse is naive); NOISE (random phases per frame:
+    it (any width, band-limited, DC-free; the plugin's pulse is naive), its V2 level a gain per
+    position (VOID_SQ_GAIN: normalize() of the naive pulse of that width); NOISE (random phases per frame:
     neighbours are unrelated; no factory preset uses it) keeps 5 evenly spaced frames;
   - each keyframe band-limited per octave from its spectrum (DFT of the 2048 samples): level l has
     N0 >> l samples and the harmonics up to (N0 >> l) / 4, so the engine reads with linear
@@ -41,7 +45,7 @@ SQUARE, NOISE = 2, 8
 
 # keyframes per table (frame numbers 0..255, the first 0 and the last 255): tools/gen_void_tables.py --choose
 KEYS = [[0, 80, 131, 255], [0, 80, 255], [0],
-        [0, 15, 26, 36, 45, 54, 63, 72, 80, 102, 124, 146, 167, 189, 211, 233, 255],
+        [0, 11, 21, 34, 45, 54, 63, 72, 80, 102, 124, 146, 167, 189, 211, 233, 255],   # SPECTRAL: chosen again for V2's frames (2026-11-19)
         [0, 21, 41, 60, 80, 127, 167, 211, 255], [0, 20, 40, 60, 80, 123, 166, 209, 255], [0, 80, 255],
         [0, 80, 184, 255], [0, 64, 128, 192, 255]]
 
@@ -86,9 +90,32 @@ def terms(tbl, frame):
     raise ValueError(tbl)
 
 
+V2_RMS, V2_PEAK = 0.35, 0.999     # WavetableBank.cpp normalize(): targetRMS, the peak cap
+
+
+def v2_scale(x):
+    """V2's normalize() of a frame: (its DC, the scale) -- the frame becomes (x - dc) * scale"""
+    n = len(x)
+    dc = sum(x) / n
+    rms = math.sqrt(sum((v - dc) ** 2 for v in x) / n)
+    peak = max(abs(v - dc) for v in x)
+    if rms < 1e-6 or peak < 1e-6:
+        return dc, 1.0
+    sc = V2_RMS / rms
+    return dc, (V2_PEAK / peak if sc * peak > V2_PEAK else sc)
+
+
+def sq_gain(frame):
+    """SQUARE at a frame: the V2 scale of the plugin's naive pulse (+-1, width 0.5 - 0.45 t), which is also the scale of
+    the engine's DC-free pulse of two saw readings (that pulse is the naive one less its DC)"""
+    pw = 0.5 - (frame / (FRAMES - 1)) * 0.45
+    edge = int(pw * FSIZE)
+    return v2_scale([1.0 if s < edge else -1.0 for s in range(FSIZE)])[1]
+
+
 def frame_wave(tbl, frame):
-    """the plugin's frame: 2048 samples, peak-normalised (standard library). SQUARE here: the saw the
-    engine makes its pulse of, (2 / pi) sum sin(h a) / h (a pulse of two readings spans +-1)"""
+    """the plugin's frame: 2048 samples, normalised as V2's normalize() (standard library). SQUARE here: the saw the
+    engine makes its pulse of, (2 / pi) sum sin(h a) / h (a pulse of two readings spans +-1; VOID_SQ_GAIN levels it)"""
     if tbl == SQUARE:
         return [(2.0 / math.pi) * sum(math.sin(h * 2.0 * math.pi * s / FSIZE) / h for h in range(1, 129))
                 for s in range(FSIZE)]
@@ -101,8 +128,8 @@ def frame_wave(tbl, frame):
     for s in range(FSIZE):
         a = 2.0 * math.pi * s / FSIZE
         out.append(sum(amp * math.sin(m * a + p) for amp, m, p in tt))
-    peak = max(abs(v) for v in out)
-    return [v / peak for v in out] if peak > 0.001 else out
+    dc, sc = v2_scale(out)
+    return [(v - dc) * sc for v in out]
 
 
 def fft(x):
@@ -178,6 +205,8 @@ def header(path):
     L += arr("VOID_KPOS", "uint8_t", kpos)
     L += arr("VOID_KOFS", "uint32_t", ofs, 8)
     L += arr("VOID_WAVE", "int16_t", wave)
+    L += ["/* SQUARE: V2's level of the pulse at position i (frame i), Q15 (the pulse of two saw readings x this) */"]
+    L += arr("VOID_SQ_GAIN", "uint16_t", [int(round(32767 * sq_gain(f))) for f in range(FRAMES)])
     L += curves()
     Path(path).write_text("\n".join(L) + "\n")
     print(f"void tables: {len(NAMES)} tables, {len(kpos)} keyframes, {len(wave) * 2} B of samples, 1.0 = {one}")
@@ -229,6 +258,11 @@ def curves():
     L += arr("VOID_LOG2P1", "int16_t", [int(round(max(-64.0, spo * math.log2(max(1 + (k - 256) / 256, 1e-6))) * 256))
                                        for k in range(513)])
     # RES 0..127: (1 - r)^1.5, Q15 (r = RES / 127, clamped at 0.9999 as the plugin's): SVF k = 2 x, ladder re = 1 - x
+    # NOISE's colour (eng_wave.c, the V2 plugin's noise: a one-pole low-pass on white noise, fc = 200 * 100^c Hz, c = COLOR / 127):
+    # its coefficient 1 - exp(-2 pi fc / FS), Q15
+    L += ["/* NOISE COLOR 0..127 -> the one-pole's 1 - exp(-2 pi fc / 44100), fc = 200 * 100^(COLOR / 127) Hz, Q15 */"]
+    L += arr("VOID_NCOL", "uint16_t", [int(round(32767 * (1 - math.exp(-2 * math.pi * 200 * 100 ** (v / 127) / 44100))))
+                                       for v in range(128)])
     L += ["/* (1 - RES / 127)^1.5, Q15 */"]
     L += arr("VOID_RES_P15", "uint16_t", [int(round(32767 * (1 - min(v / 127, 0.9999)) ** 1.5)) for v in range(128)])
     return L
@@ -252,8 +286,8 @@ def choose(db):
         for f in range(FRAMES):
             if True:
                 x = sum(amp * np.sin(m * a + p) for amp, m, p in terms(tb, f))
-                pk = np.max(np.abs(x))
-                x = x / pk if pk > 0.001 else x
+                dc, sc = v2_scale(list(x))
+                x = (x - dc) * sc
             X = np.fft.rfft(x)
             X[0] = 0.0
             X[hmax + 1:] = 0.0

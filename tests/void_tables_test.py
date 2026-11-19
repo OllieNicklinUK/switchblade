@@ -35,8 +35,8 @@ def parse(path):
 def plugin_frame(tb, f):
     a = 2.0 * np.pi * np.arange(g.FSIZE) / g.FSIZE
     x = sum(amp * np.sin(m * a + p) for amp, m, p in g.terms(tb, f))
-    pk = np.max(np.abs(x))
-    return x / pk if pk > 0.001 else x
+    dc, sc = g.v2_scale(list(x))                       # V2's normalize(): DC out, RMS 0.35, the peak at most 0.999
+    return (x - dc) * sc
 
 
 def bandlimit(x, n, hmax):
@@ -67,6 +67,11 @@ def main(path):
             ref = bandlimit(sq, n0, n0 // 4)
             e = 20 * np.log10(np.sqrt(np.mean((pulse - ref) ** 2)) / np.sqrt(np.mean(ref ** 2)))
             check(e < -60, f"SQUARE: two saw readings = the plugin's 50 % pulse, band-limited ({e:.0f} dB)")
+            gq = arrs["VOID_SQ_GAIN"]
+            pw = [0.5 - (f / 255) * 0.45 for f in range(256)]
+            want = [min(0.35 / (2 * np.sqrt(d * (1 - d))), 0.999 / (2 * max(d, 1 - d))) for d in pw]
+            err = max(abs(gq[f] / 32767 - want[f]) / want[f] for f in range(256))
+            check(len(gq) == 256 and err < 0.01, f"SQUARE: V2's level per width (VOID_SQ_GAIN within {100 * err:.2f} %)")
             continue
         keys = arrs["VOID_KPOS"][k0:k1]
         fr = {}

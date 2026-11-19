@@ -6,9 +6,9 @@
  *    spread, glide, LFO routing, filter envelope, matrix.
  * 2. pitch: SINE at A4 is 440 Hz within the plugin's movement (drift +-1.5 cents, micro-LFO up to 2.5), and at
  *    A3 220 Hz.
- * 2b. one oscillator (Task 4.4): the dead edit slots (TBL2, MIX, OSC2: label "-", no range) are hidden from the pages,
- *    and nothing a preset or a project holds in them sounds: every preset renders the same with them at 0 and at
- *    the ends of their old ranges.
+ * 2b. V2's parts (2026-11-19; the slots Task 4.4 hid, MIX and OSC2, are PENV and SUB): off, inert (every preset with
+ *    SUB and NOISE at 0 the same whatever COLOR and the sub's octave hold; OLVL 0 = 64); PENV bends a note's start and
+ *    settles, SUB is a sine one or two octaves down, NOISE sounds and COLOR darkens it.
  * 2c. Task 4.5: VOWEL (type 6: F1 / F2 where the vowel table puts them, the level against LP24, bounded and inside the mixer's integer
  *    headroom), WARP (E2: 64 off bit for bit, the aliasing at C7, the old TBL2 values load as off), LP24 as it was bit for bit, the TYPE switched
  *    every block (no table read out of range), and OB-Z / ACID / DRIFT playing type 6.
@@ -164,6 +164,10 @@ static track_t *plain(uint32_t tb1, uint32_t ft)
     t->p[P_M2SRC] = 1; t->p[P_M2DST] = 3; t->p[P_M2AMT] = 11;
     t->p[P_M3SRC] = t->p[P_M3DST] = t->p[P_M3AMT] = 0;
     t->p[P_M4SRC] = t->p[P_M4DST] = t->p[P_M4AMT] = 0;
+    t->p[P_FM2_ATK] = 0;                               /* V2: no NOISE (COLOR white, the sub one octave down), OLVL the default */
+    t->p[P_FM2_SUS] = 127;
+    t->p[P_FM2_DEC] = 0;
+    t->p[P_FM3_ATK] = 0;
     return t;
 }
 
@@ -188,19 +192,15 @@ static double cents(double f, double ref) { return 1200.0 * log2(f / ref); }
 static void test_engine(void)
 {
     const engine_t *e = ENGINES[ENGI_WAVE];
-    uint32_t k, hidden = 0;
-    check("engine 1 is WAVE, two EDIT pages of four (TBL1 POS WARP -, CUT RES - DRV), presets",
+    check("engine 1 is WAVE, two EDIT pages of four (TBL1 POS WARP PENV, CUT RES SUB DRV), presets",
           str_eq(e->name, "WAVE") && str_eq(e->edit[0].label, "TBL1") && str_eq(e->edit[1].label, "POS") &&
           str_eq(e->edit[4].label, "CUT") && str_eq(e->edit[5].label, "RES") && str_eq(e->edit[7].label, "DRV") &&
           e->npresets >= 5u && e->mem);
-    /* the one-oscillator WAVE (Task 4.4): TBL2 (E2), MIX (E3) and OSC2 (E6) keep their ids, so the stored layout does
-     * not move, but are hidden: label "-" (a blank card on the pages, "E3" in the matrix: mod.c mod_dst_name) and no
-     * range (a knob turn does nothing, a matrix destination adds nothing: the convention of the inert G_DRLVL) */
-    for (k = 0; k < 8u; k++)
-        if (k == 3u || k == 6u)
-            hidden += e->edit[k].label && e->edit[k].label[0] == '-' && e->edit[k].min == 0 && e->edit[k].max == 0 &&
-                      e->edit[k].def == 0;
-    check("WAVE: MIX and OSC2 (E4, E7 in the matrix) are hidden: label \"-\", range 0..0, default 0", hidden == 2u);
+    /* V2 (2026-11-19): the slots Task 4.4 hid (MIX E3, OSC2 E6) are V2's PENV and SUB; their ids did not move, so a project
+     * saved since Task 4.4 (which stored 0 there: the range was 0..0) loads them off */
+    check("WAVE: E3 is PENV (-24..24 semitones, default 0), E6 is SUB (0..127, default 0)",
+          str_eq(e->edit[3].label, "PENV") && e->edit[3].min == -24 && e->edit[3].max == 24 && e->edit[3].def == 0 &&
+          str_eq(e->edit[6].label, "SUB") && e->edit[6].min == 0 && e->edit[6].max == 127 && e->edit[6].def == 0);
     check("WAVE: E2 is WARP, 9..127, default 64 (off); TYPE has a VOWEL as its 7th",
           str_eq(e->edit[2].label, "WARP") && e->edit[2].min == 9 && e->edit[2].max == 127 && e->edit[2].def == 64 &&
           TP[P_FTYPE].max == 6 && str_eq(TP[P_FTYPE].names[6], "VOWEL"));
@@ -267,11 +267,11 @@ static void test_pitch(void)
 }
 
 /* ----------------------------------------------------------------- 2b --- */
-/* One oscillator (Task 4.4): MIX (P_E3) and OSC2 (P_E6) are dead (TBL2, P_E2, is WARP since Task 4.5, held at 64 = off here). Every factory preset, rendered for 0.5 s with a
- * 3-note chord through the part's own path, must come out the same sample for sample with those three at 0 and with
- * each at the far end of what they once held (TBL2 8, MIX 127, OSC2 MORPH = 69, then +12 st = 62). A project or a user preset
- * from before the change carries such values: they must not sound. The real render is compared, not a flag. */
-static uint64_t chord_hash(uint32_t pi, int t2, int mx, int o2)
+/* V2's parts (2026-11-19): PENV (E3), SUB (E6), NOISE / COLOR / the sub's octave (P_FM2_ATK / SUS / DEC), OLVL (P_FM3_ATK).
+ * Off, they are inert: every factory preset with its own SUB and NOISE at 0 renders the same sample for sample whatever
+ * COLOR and the sub's octave hold, and OLVL 0 is OLVL 64 (the default of every project from before them). On: PENV bends
+ * the start of a note and is gone after its 51 ms, SUB adds a sine one or two octaves down, NOISE's COLOR darkens it. */
+static uint64_t chord_hash(uint32_t pi, int col, int soct, int olvl, int zero)
 {
     static const uint8_t N[3] = {48, 55, 64};
     track_t *t = &trk[0];
@@ -282,9 +282,14 @@ static uint64_t chord_hash(uint32_t pi, int t2, int mx, int o2)
     fresh(ENGI_WAVE, pi);
     t->p[P_DIST] = t->p[P_CHOR] = t->p[P_DLY] = t->p[P_REV] = 0;
     t->p[P_VOICE] = V_POLY;                            /* (UNISON's start phases come from a static seed no reset reaches: two renders differ) */
-    t->p[P_E2] = (int16_t)t2;
-    t->p[P_E3] = (int16_t)mx;
-    t->p[P_E6] = (int16_t)o2;
+    if (zero)
+        t->p[P_E6] = t->p[P_FM2_ATK] = 0;              /* SUB and NOISE off */
+    if (col >= 0)
+        t->p[P_FM2_SUS] = (int16_t)col;
+    if (soct >= 0)
+        t->p[P_FM2_DEC] = (int16_t)soct;
+    if (olvl >= 0)
+        t->p[P_FM3_ATK] = (int16_t)olvl;
     for (i = 0; i < 3u; i++)
         trk_note_on(t, N[i], 100);
     nrec = 0;
@@ -293,23 +298,105 @@ static uint64_t chord_hash(uint32_t pi, int t2, int mx, int o2)
         h = (h ^ (uint32_t)rec[i]) * 1099511628211ull;
     return h;
 }
-static void test_one_osc(void)
+/* the amplitude of the component at hz in rec[a .. b) (one Goertzel bin) */
+static double tone_amp(uint32_t a, uint32_t b, double hz)
+{
+    double w = 2.0 * M_PI * hz / FS, c = 2.0 * cos(w), s0, s1 = 0, s2 = 0;
+    uint32_t i;
+    for (i = a; i < b; i++) {
+        s0 = rec[i] + c * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+    return sqrt(s1 * s1 + s2 * s2 - c * s1 * s2) * 2.0 / (b - a);
+}
+static double zc_rate(uint32_t a, uint32_t b)
+{
+    uint32_t i, n = 0;
+    for (i = a + 1u; i < b; i++)
+        n += (rec[i - 1u] < 0) != (rec[i] < 0);
+    return (double)n * FS / (b - a);
+}
+static void test_v2_parts(void)
 {
     uint32_t k, bad_n = 0;
-    char msg[160];
+    double f0, f1, sub1, sub2, base1, zw, zd;
+    char msg[200];
+    track_t *t;
     for (k = 0; k < ENGINES[ENGI_WAVE]->npresets; k++) {
-        uint64_t a = chord_hash(k, 64, 0, 0);
-        if (a != chord_hash(k, 64, 127, 69) || a != chord_hash(k, 64, 64, 62) || a != chord_hash(k, 64, 127, 0) ||
-            a != chord_hash(k, 64, 0, 69)) {
-            printf("void: OSC2 still sounds: %s\n", ENGINES[ENGI_WAVE]->presets[k].name);
+        uint64_t a = chord_hash(k, -1, -1, -1, 1);
+        if (a != chord_hash(k, 0, 127, -1, 1) || a != chord_hash(k, 127, 0, -1, 1)) {
+            printf("void: COLOR / the sub's octave sound with SUB and NOISE off: %s\n", ENGINES[ENGI_WAVE]->presets[k].name);
             bad_n++;
         }
-        if (chord_hash(k, 64, 0, 0) == 1469598103934665603ull)   /* (the render must have run: hashed something) */
+        if (a == 1469598103934665603ull)               /* (the render must have run: hashed something) */
             bad_n++;
     }
-    snprintf(msg, sizeof msg, "one oscillator: MIX and OSC2 at any value change no sample of any preset (%u of %u differ)",
+    {
+        uint64_t a = chord_hash(0, -1, -1, 0, 1);
+        bad_n += a != chord_hash(0, -1, -1, 64, 1) || a == chord_hash(0, -1, -1, 32, 1);
+    }
+    snprintf(msg, sizeof msg, "V2 parts off: SUB 0 and NOISE 0 leave COLOR and the sub's octave silent, OLVL 0 = 64 (%u of %u differ)",
              bad_n, (unsigned)ENGINES[ENGI_WAVE]->npresets);
     check(msg, bad_n == 0u);
+    /* PENV +12: the first ms of A3 an octave up (the peak 0.5 + 0.5 x 127 / 127 velocity: all of it), 220 Hz again after it */
+    t = plain(0, 3);
+    t->p[P_E3] = 12;
+    trk_note_on(t, 57, 127);
+    blocks(NREC / CTL);
+    f0 = freq_of(4u * CTL, 4u * CTL + FS / 200u);      /* ~3 .. 8 ms: around 0.85 .. 0.7 of the 12 semitones */
+    f1 = freq_of(FS / 4u, NREC);
+    printf("void: PENV +12 on A3: %.1f Hz at 3-8 ms, %.2f Hz after\n", f0, f1);
+    check("PENV +12: a note starts well above its pitch (> +6 semitones at 3-8 ms) and settles on it (+-4 cents after 0.25 s)",
+          cents(f0, 220.0) > 600.0 && fabs(cents(f1, 220.0)) < 4.0);
+    /* SUB on a SINE at A4, measured apart from it: one octave down (220 Hz) at P_FM2_DEC < 64, two (110 Hz) at >= 64, and its level against
+     * the oscillator's as in the plugin: SUB / 127 of the plugin's 1.0 against the oscillator's table level times its 0.8 x 0.707 (WAVE's
+     * oscillator runs at 1 / 0.5657 of the plugin's until VOID_OUT_LEVEL, so the sub does too). SUB 24: under the voice's soft clipper and the master's limiter (higher, the
+     * limiter on the mix squashes the sub and this ratio).
+     * Over 0.1 s: the oscillator's drift (the plugin's micro-LFO, up to 2.5 cents) would smear one bin over a longer window */
+    t = plain(0, 3);
+    trk_note_on(t, 69, 100);
+    blocks(NREC / CTL);
+    base1 = tone_amp(FS / 4u, FS / 4u + FS / 10u, 440.0);
+    t = plain(0, 3);
+    t->p[P_FM3_ATK] = 1;                               /* (the oscillator near silent: the sub alone) */
+    t->p[P_E6] = 24;
+    t->p[P_FM2_DEC] = 0;
+    trk_note_on(t, 69, 100);
+    blocks(NREC / CTL);
+    sub1 = tone_amp(FS / 4u, FS / 4u + FS / 10u, 220.0);
+    t = plain(0, 3);
+    t->p[P_FM3_ATK] = 1;
+    t->p[P_E6] = 24;
+    t->p[P_FM2_DEC] = 127;
+    trk_note_on(t, 69, 100);
+    blocks(NREC / CTL);
+    sub2 = tone_amp(FS / 4u, FS / 4u + FS / 10u, 110.0);
+    {
+        double want = (24.0 / 127.0) / (0.495 * 0.8 * 0.7071);   /* the sub / the SINE's peak (V2: RMS 0.35) at the plugin's voice level */
+        printf("void: SUB 24: 220 Hz %.0f, 110 Hz %.0f (two down); SINE A4 alone 440 Hz %.0f: sub / osc %.2f (want %.2f)\n", sub1, sub2,
+               base1, sub1 / base1, want);
+        check("SUB: a sine one octave down (two with the octave >= 64), its level against the oscillator's the plugin's (within 1.5 dB)",
+              base1 > 0 && fabs(20 * log10(sub1 / base1 / want)) < 1.5 && fabs(20 * log10(sub2 / sub1)) < 1.0);
+    }
+    /* NOISE alone (the oscillator's level near 0: OLVL 1): COLOR 127 white, COLOR 0 a 200 Hz low-pass (fewer zero crossings) */
+    t = plain(0, 3);
+    t->p[P_FM3_ATK] = 1;
+    t->p[P_FM2_ATK] = 127;
+    t->p[P_FM2_SUS] = 127;
+    trk_note_on(t, 69, 100);
+    blocks(NREC / CTL);
+    zw = zc_rate(FS / 4u, NREC);
+    t = plain(0, 3);
+    t->p[P_FM3_ATK] = 1;
+    t->p[P_FM2_ATK] = 127;
+    t->p[P_FM2_SUS] = 0;
+    trk_note_on(t, 69, 100);
+    blocks(NREC / CTL);
+    zd = zc_rate(FS / 4u, NREC);
+    printf("void: NOISE 127 zero crossings: COLOR 127 %.0f / s, COLOR 0 %.0f / s\n", zw, zd);
+    check("NOISE: it sounds, and COLOR 0 is far darker than COLOR 127 (a quarter of the zero crossings or fewer)",
+          zw > 2000.0 && zd < zw / 4.0);
 }
 
 /* ------------------------------------------------------------------ 4.5 --- */
@@ -317,9 +404,13 @@ static void test_one_osc(void)
  * with the cutoff held and again swept (a triangle over the blocks, through the closing region), a 4-note chord, the first two released
  * part-way: 144 renders of 64 blocks, hashed together. The WAVE_RENDER_HASH rows were recorded from the tree at 1a5b3df/e1acdb7 (before
  * Task 4.5). The LP24 ladder is untouched (the user kept it), so every type that existed is bit for bit as before, and WARP at 64 (off) keeps it so. */
-static const uint64_t SCEN_HASH[7] = {0x89c9d66272840c8aull, 0x723981c818e6fee8ull, 0xb82f2a46533caa75ull, 0xd106dfad484512ccull,
-                                      0x1695f2cbd027b44dull, 0x4f6e5c2300649526ull,
-                                      0xc119b16700c137c2ull};   /* LP24 BP HP LP12 HP24 NOTCH, VOWEL (the same with the WARP code compiled out: WARP at 64 keeps it) */
+/* V2 (2026-11-19): re-recorded on purpose. The tables are at V2's level (DC out, RMS 0.35: tools/gen_void_tables.py) and the drive is V2's
+ * shaper (eng_wave.c void_front), so every scenario's samples moved; the recording is of the V2 tree, the fast loops and the forced slow
+ * loop agreeing (the check below). Before: 89c9d66272840c8a 723981c818e6fee8 b82f2a46533caa75 d106dfad484512cc 1695f2cbd027b44d
+ * 4f6e5c2300649526 c119b16700c137c2 (Task 4.5) */
+static const uint64_t SCEN_HASH[7] = {0x67dcdd12766dd0d6ull, 0x4a9bcf43ed0f6d71ull, 0xece1394f744cddfbull, 0x94b33c081a22e1b0ull,
+                                      0x9d9bf361e21afed6ull, 0x9e74bfe4ef5a3cecull,
+                                      0x8396582a14330244ull};   /* LP24 BP HP LP12 HP24 NOTCH, VOWEL */
 static uint64_t scen_hash(uint32_t ft)
 {
     static const uint8_t TB[3] = {1, 2, 3}, N[4] = {36, 43, 60, 84}, CUT[4] = {0, 1, 64, 127}, RES[3] = {0, 64, 127};
@@ -895,9 +986,11 @@ static void test_vowel_bounded(void)
     pkl = bounded_run(VF_LP24, &wl, &dcl);
     /* a 2-voice chord peaks at pkv; the mixer takes b (the part's sum, 32768 per full scale) as x = ((b >> 2) * 9713) >> 10 at LEVEL 127 and needs
      * x * 4096 < 2^31 (x <= 524287); a WAVE part plays 6 voices, so 3 x this chord */
-    snprintf(msg, sizeof msg, "VOWEL, RES 127 + DRV 127, MIDI 24..99: no wrapped sample, DC under 1 %% of the rms (%.3f %%), peak %.0f (LP24: %.0f; x at LEVEL 127 for 6 voices %.0f of 524287)",
+    snprintf(msg, sizeof msg, "VOWEL, RES 127 + DRV 127, MIDI 24..99: no wrapped sample, DC under 2 %% of the rms (%.3f %%), peak %.0f (LP24: %.0f; x at LEVEL 127 for 6 voices %.0f of 524287)",
              dcv * 100, pkv, pkl, pkv * 3 * 9713 / 4096.0);
-    check(msg, wv == 0 && dcv < 0.01 && pkv < 1.15 * pkl + 1 && pkv * 3 * 9713 / 4096.0 < 524287.0);
+    /* (V2: 2 %. V2's shaper folds asymmetrically (its even harmonics), and the voice's soft clipper, symmetric, turns a little of that into DC
+     * after the blocker: 1.6 .. 1.8 % here, -36 dB; the plugin's voice does the same. It was under 1 % with V1's shaper.) */
+    check(msg, wv == 0 && dcv < 0.02 && pkv < 1.15 * pkl + 1 && pkv * 3 * 9713 / 4096.0 < 524287.0);
 }
 
 /* the post-filter chain (clamp 110000, VOID_OUT_LEVEL, DC blocker, void_clip) is the one every filter shares: a voice's peak is VOID_CLIP_THR +
@@ -1219,7 +1312,7 @@ static void test_reference(const char *dir)
         ok_lvl &= fabs(dl) < 0.5;
     }
     if (!have) {
-        printf("void: vs plugin: no reference in %s (tools/void_ref.cpp needs ../VoidWave), skipped\n", dir);
+        printf("void: vs plugin: no reference in %s (tools/void_ref.cpp needs the V2 plugin: ../../VOID SYNTH/VoidWave or VOIDWAVE_DIR), skipped\n", dir);
         return;
     }
     snprintf(msg, sizeof msg, "vs the plugin's Filter.cpp: %u cases, levels within 0.5 dB (worst %.2f)", have, worst_lvl);
@@ -1287,7 +1380,7 @@ int main(int argc, char **argv)
     test_engine();
     test_px();
     test_pitch();
-    test_one_osc();
+    test_v2_parts();
     test_scen();
     test_bandlimit();
     test_bounded();

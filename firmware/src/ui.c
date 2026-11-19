@@ -424,6 +424,8 @@ static int page_visible(uint32_t i)
 {
     if (PAGES[i].id[0] == P_FM1_ATK)                  /* FLT ENV: WAVE's filter envelope, NANO's SUB model's (2026-10-21) */
         return TSEL->eng_req % NENGINES == ENGI_WAVE || (TSEL->eng_req % NENGINES == ENGI_ACID && sub_on(TSEL));
+    if (PAGES[i].id[0] == P_FM2_ATK)                  /* NOISE (V2): WAVE's noise */
+        return TSEL->eng_req % NENGINES == ENGI_WAVE;
     if (PAGES[i].id[0] == P_RSV_LN)                   /* JUNO (Task 6.2): DRIFT's chorus */
         return TSEL->eng_req % NENGINES == ENGI_DRIFT;
     if (PAGES[i].id[0] == P_FTYPE)                    /* FILTER (1.5, #104): OB-Z's, WAVE's, NANO SUB's (its TYPE: LP24 BP HP LP12) */

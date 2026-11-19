@@ -224,6 +224,9 @@ static const param_desc_t GP[G_COUNT] = {
     [G_CLKOUT] = PE("CLKO", N_ONOFF, 1),          /* FM1-Four: MIDI clock out (F8 FA FC) while the clock is INT */
 };
 
+/* WAVE's NOISE and COLOR (V2, eng_wave.c) on the NOISE page: the same range and default as the ids' own (P_FM2_ATK, P_FM2_SUS:
+ * what projects, user presets and the editor use), the device's labels */
+static const param_desc_t WAVE_NZ_DESC[2] = {{"NOIS", F_PCT, 0, 127, 0, 0, 0}, {"TONE", F_PCT, 0, 127, 127, 0, 0}};
 static const param_desc_t *track_desc(const track_t *t, uint32_t id)
 {
     if (id >= P_E0 && id <= P_E7) {                   /* the engine asked for (t->engine follows after a fade) */
@@ -235,6 +238,8 @@ static const param_desc_t *track_desc(const track_t *t, uint32_t id)
         return ins_desc(t->p[P_ITYPE], id - P_IA);
     if (t->p[P_ESYNC] && (id == P_ATK || id == P_DEC || id == P_REL))   /* ENV SYNC: note values (1.5, #175) */
         return &ESYNC_DESC[id == P_ATK ? 0 : id == P_DEC ? 1 : 2];
+    if ((id == P_FM2_ATK || id == P_FM2_SUS) && eng_idx(t->eng_req) == ENGI_WAVE)   /* WAVE's NOISE page (V2): the device's labels */
+        return &WAVE_NZ_DESC[id == P_FM2_SUS];
     return &TP[id];
 }
 
@@ -437,6 +442,8 @@ static const page_t PAGES[] = {
     {"FILTER", FAM_EDIT, SC_TRACK, GR_NONE, {P_FTYPE, P_E4, P_E5, P_E7}},
     {"FLT ENV", FAM_EDIT, SC_TRACK, GR_ADSR, {P_FM1_ATK, P_FM1_DEC, P_FM1_SUS, P_FM1_REL}},   /* WAVE only: its filter
                                                                    * envelope (eng_wave.c; the retired DIGITAL's operator 1 ids) */
+    {"NOISE", FAM_EDIT, SC_TRACK, GR_NONE, {P_FM2_ATK, P_FM2_SUS, 0xFF, 0xFF}},   /* WAVE only (V2): its noise, NOISE and COLOR
+                                                                   * (eng_wave.c; the retired DIGITAL's operator 2 ids) */
     {"VOICE", FAM_EDIT, SC_TRACK, GR_NONE, {P_VOICE, P_GLIDE, P_GLMODE, P_PRIO}},
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_MUTE}},
     {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, 0xFF, 0xFF, 0xFF}},   /* #148: SPREAD */
