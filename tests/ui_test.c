@@ -3864,6 +3864,43 @@ static int test_edit_layer_four(void)
     return bad;
 }
 
+/* V2: OCT+ held + PRESETS = the machine, a detent each, in the EDIT layer's order (first preset); the octave stays; OCT+
+ * alone still goes up an octave (on release now); the whole hold one undo (SAVE held: the sound before it) */
+static int test_oct_machine(void)
+{
+    int bad = 0;
+    uint32_t e0, i, ok = 1;
+    ui_power_on(); go_home(); frame();
+    song.octave = 0;
+    e0 = TSEL->eng_req;
+    btn_down(B_OCTUP); frame();
+    bad += check("OCT+ down: the octave waits for the release", song.octave == 0);
+    turn(EN_PRESET, 1);
+    bad += check("..PRESETS right: the next machine, its first preset", TSEL->eng_req == eng_step(e0, 1) && TSEL->preset == 0);
+    turn(EN_PRESET, 1);
+    turn(EN_PRESET, -1);
+    bad += check("..right, left: back to it", TSEL->eng_req == eng_step(e0, 1));
+    btn_up(B_OCTUP); frame();
+    bad += check("..let go: the octave unchanged", song.octave == 0);
+    hold(B_SAVE);
+    bad += check("SAVE held: the one undo, back to the machine before the hold", TSEL->eng_req == e0);
+    btn_down(B_OCTUP); frame();
+    for (i = 0; i < NENG_SHOWN; i++) {
+        turn(EN_PRESET, -1);
+        ok &= TSEL->eng_req != e0 || i == NENG_SHOWN - 1u;
+    }
+    btn_up(B_OCTUP); frame();
+    bad += check("OCT+ held, PRESETS left 8: round all eight to the start", ok && TSEL->eng_req == e0 && song.octave == 0);
+    press(B_OCTUP);
+    bad += check("OCT+ tapped alone: up an octave, the machine stays", song.octave == 1 && TSEL->eng_req == e0);
+    turn(EN_PRESET, 1);
+    bad += check("PRESETS without OCT+: the preset list again (the machine's next preset)",
+                 TSEL->eng_req == e0 && TSEL->preset == 1);
+    btn_down(B_OCTUP); frame(); btn_down(B_OCTDN); frame(); btn_up(B_OCTDN); frame(); btn_up(B_OCTUP); frame();
+    bad += check("OCT+ then OCT- together: the octave reset, no octave on OCT+'s release", song.octave == 0);
+    return bad;
+}
+
 /* ------------------------------------------------ the GLO SCL EDIT layers --- */
 static uint32_t black(uint32_t b) { return key_at(1, b); }
 static void lay_combo(uint32_t btn, uint32_t k) { btn_down(btn); key_down(k); frame(); }
@@ -8774,6 +8811,7 @@ int main(void)
     bad += test_home_big();
     bad += test_pages_four();
     bad += test_edit_layer_four();
+    bad += test_oct_machine();
     bad += test_quick_layers();
     bad += test_chord_page();
     bad += test_bughunt_ui();

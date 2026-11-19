@@ -1082,6 +1082,11 @@ static void seq_entry(uint32_t pressed)
     }
 }
 
+/* OCT+ held + PRESETS = the machine (V2): OM_HELD while OCT+ is down from a press that would have changed the octave
+ * (it now does that on release), OM_SWITCHED once PRESETS has switched the machine in that hold (then no octave) */
+enum { OM_HELD = 1, OM_SWITCHED = 2 };
+static uint8_t oct_mach;
+
 /* Discussions #92 / #94: the PRESETS knob by page (the menu, a dialog, NAME and the layers: ui_input before this).
  *   the SEQ pages (STEP: the step cursor; AUTOMATION: the row) and the list / action pages USER,
  *     PHRASES, PROJECT, SONG: as their KNOB 1 (the SEQ pages: a sound load there would drop the track's motion: never).
@@ -1096,6 +1101,16 @@ static void presets_turn(int32_t s)
     const page_t *pg = cur_page();
     uint32_t g = pg->graph;
     uint64_t held = lock_held();
+    if (oct_mach) {                                       /* OCT+ held (V2): the selected track's machine, a detent each, in
+                                                         * the EDIT layer's order; its first preset. One undo (SAVE held)
+                                                         * for the whole hold; the octave stays */
+        if (!(oct_mach & OM_SWITCHED))
+            undo.keep = 0;                                /* (the first switch copies the track as it was) */
+        select_engine(eng_step(TSEL->eng_req, s > 0 ? 1 : -1));
+        preset_hinted();
+        oct_mach |= OM_SWITCHED;
+        return;
+    }
     if (detail_on()) {                                    /* DETAIL (1.5.1): the cursor (its KNOB 1 is CHANCE) */
         if (chain_busy())
             ui_message("STOP TO EDIT");
@@ -1494,10 +1509,14 @@ static void ui_input(void)
             uint32_t both = (1u << panel.btn[B_OCTDN]) | (1u << panel.btn[B_OCTUP]);
             if (act_cols() || layer_set_open() || ui.ml.on)   /* action pages: enter / back (below); SET layers: OCT-; */
                 break;                                  /* MIDI LEARN: clear / done (below) */
-            if ((fm1_in.buttons & both) == both)
+            if ((fm1_in.buttons & both) == both) {
                 song.octave = 0;
-            else
-                song.octave += b == B_OCTDN ? (song.octave > -3 ? -1 : 0) : (song.octave < 3 ? 1 : 0);
+                oct_mach = 0;                           /* (OCT- with OCT+ held: the reset, no octave on OCT+'s release) */
+            } else if (b == B_OCTDN) {
+                song.octave += song.octave > -3 ? -1 : 0;
+            } else {
+                oct_mach = OM_HELD;                     /* OCT+: the octave on release, unless PRESETS switched the machine */
+            }
             break;
         }
         default:                                        /* page buttons (GLO SCL ENV LFO EDIT ARP): when let go */
@@ -1505,6 +1524,11 @@ static void ui_input(void)
                 ui.pg_down |= (uint16_t)(1u << id);
             break;
         }
+    }
+    if (oct_mach && !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u)) {   /* OCT+ let go: */
+        if (!(oct_mach & OM_SWITCHED))                  /* a tap (no machine switched while held): up an octave */
+            song.octave += song.octave < 3 ? 1 : 0;
+        oct_mach = 0;
     }
     b = ui.pg_down & ~fm1_in.buttons;
     ui.pg_down &= (uint16_t)~b;

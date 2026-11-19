@@ -1,12 +1,13 @@
-# V2 device test (build v0.3-v2test3; test1 and test2 also work with this sheet)
+# V2 device test (build v0.3-v2test4; test1 to test3 also work with this sheet)
 
 The first V2 build on a real FM-1. It checks that saving still works on your unit, measures the CPU on the device for
 the first time, and tries the new MIDI. About 30–40 minutes. Note what you see against each step; anything odd is
 worth writing down, even if you are not sure it is a fault.
 
-**The build (use this one):** `build/release-0.3-v2test3/switchblade-0.3-v2test3.fwsc`, identity `FM-1_9403`, version
-`v0.3-v2test3`, SHA-256 `669f478d…0ffcf177` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
-have their own voices**. Its installer site is `build\v2test3-site`.
+**The build (use this one):** `build/release-0.3-v2test4/switchblade-0.3-v2test4.fwsc`, identity `FM-1_9403`, version
+`v0.3-v2test4`, SHA-256 `86ef9ba3…d493703b` (`SHA256SUMS` beside it). Branch `v2`, Phases 0 to 4: **all eight machines
+have their own voices**. Its installer site is `build\v2test4-site`.
+(test4 is test3 plus OCT+ held and the PRESETS knob to switch machine, section 3.)
 (test3 is test2 with JP-Z's crackle fixed: its mix ran 8x hot, so the saws in phase clipped its filter and wrapped its
 voice gain. test2, `v0.3-v2test2`, `build\v2test2-site`, has that crackle.)
 (test1, `v0.3-v2test1`, `build\v2test-site`: Phases 0 and 1 only, JP-Z, GW-Z and MICRO a placeholder saw.)
@@ -35,7 +36,7 @@ machine knob sweeps the wavetable, GRIT on page 2. For CPU (section 4), add mix 
 The command-line installer needs `python-rtmidi`, which is not on this PC, so use the web installer from a local copy:
 
 ```
-cd D:\Switchblade\FM1-Four\build\v2test3-site
+cd D:\Switchblade\FM1-Four\build\v2test4-site
 py -3 -m http.server 8000
 ```
 
@@ -44,7 +45,7 @@ editor tab and any DAW using the FM-1's MIDI port first. Leave the server window
 
 ## 2. Saving (the most important check)
 
-- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test3**.
+- [ ] MENU > SYSTEM > INFO shows **v0.3-v2test4**.
 - [ ] Your 0.2-beta projects and user presets are still there, and load and sound as before.
 - [ ] Change a MENU setting, save a **project** and a **user preset**, switch the FM-1 off and on: all three kept.
 - [ ] Optional: the USB serial console's `status` shows `flash 1` (saving allowed).
@@ -54,6 +55,9 @@ If saving fails: stop, and roll back (section 6). Nothing else matters until thi
 ## 3. The eight machines
 
 - [ ] EDIT held, white keys 1..8: OB-Z, WAVE, NANO, JUNO, JP-Z, CZ-Z, GW-Z, MICRO.
+- [ ] (test4) **OCT+ held, PRESETS knob turned:** the machines one a detent, in that order (each at its first preset);
+      let go: the octave has not moved. OCT+ tapped alone still goes up an octave (now when you let go). SAVE held
+      afterwards undoes the whole hold. (EDIT held + KNOB 1 does the same, as before.)
 - [ ] **CZ-Z** (key 6) plays its own sound. Try a few presets of each kind (KEYS, BASS, LEAD, ATMOS). EDIT pages
       OSC (WAV1 WAV2 LINE DTN) and DCW (CUT KEYF MOD DCWE). CUT and the machine knob (DCWE) should brighten it.
 - [ ] Presets now go to **50** on every machine ("10 / 50" on the panel).
