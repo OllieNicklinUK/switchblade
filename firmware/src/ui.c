@@ -162,6 +162,7 @@ static struct {
     uint8_t msg_t;               /* transient message frames */
     uint8_t help_t;              /* 1.5, MENU > HELP ON: frames the page's hint stays in the footer (ui_help.c) */
     uint8_t bpm_t;               /* frames the BPM stays highlighted after a SELECT turn */
+    uint8_t lvl_t;               /* frames the rack (ui_rack.c) shows the level over its scope after a SELECT turn */
     uint8_t act;                 /* action pages: the column whose action OCT+ does, + 1; 0 = none (act_col) */
     uint8_t tl_clean;            /* SAVE > TOOLS: KNOB 2 turned on past INIT, CLEAN INIT picked (1.5.5, #190) */
     uint32_t rec_t0;             /* REC press time: a tap arms (btn_hold, no hold: held, REC opens its layer) */
@@ -383,7 +384,9 @@ static uint32_t large_kind(void)
 static int big_page(void) { return !ui.home && !ui.layer && cur_page()->graph == GR_BIG; }
 /* VOID FOUR's HOME (ui_big.c draw_home_big) shown: the track tabs, the sound, TRACK PRESET VOLUME TEMPO, the steps */
 static int big_home(void) { return ui.home && !ui.layer; }
-static int big_screen(void) { return big_page() || big_home(); }   /* (either: its strips cover every row) */
+static int rows_view(void);                              /* V2: a page shown as a list of rows (ui_rows.c) */
+static uint32_t rows_list(uint32_t fam, uint8_t *r);
+static int big_screen(void) { return big_page() || big_home() || rows_view(); }   /* (its strips cover every row) */
 /* the geometry of the page shown: the cards' height, the panel's top and height */
 static uint32_t card_h(void) { return large_kind() == LK_TALL ? LG_CARD_H : CARD_H; }
 static uint32_t graph_y(void) { return large_kind() == LK_TALL ? LG_Y_GRAPH : Y_GRAPH; }
@@ -422,6 +425,8 @@ static uint32_t layer_btn(void);
 /* FLT ENV: a WAVE track's (its filter envelope, eng_wave.c); FILTER: an OB-Z or WAVE track's; JUNO: a DRIFT track's */
 static int page_visible(uint32_t i)
 {
+    if (PAGES[i].graph == GR_BIG)                     /* V2: EDIT's big cards are HOME's knob panel (ui_rack.c) */
+        return 0;
     if (PAGES[i].id[0] == P_FM1_ATK)                  /* FLT ENV: WAVE's filter envelope, NANO's SUB model's (2026-10-21) */
         return TSEL->eng_req % NENGINES == ENGI_WAVE || (TSEL->eng_req % NENGINES == ENGI_ACID && sub_on(TSEL));
     if (PAGES[i].id[0] == P_RSV_LN)                   /* JUNO (Task 6.2): DRIFT's chorus */
@@ -671,8 +676,9 @@ static void open_family(uint32_t fam)
             if (PAGES[i].graph == GR_USER) break;
         ui.page = (uint8_t)i;                         /* SAVE enters the sound save screen directly */
     } else if (fam == FAM_EDIT) {
-        ui.page = (uint8_t)page_first(FAM_EDIT);      /* VOID FOUR: EDIT always opens on its big page (taps inside the
-                                                       * family go on to MACHINE 1, 2, ..) */
+        uint8_t r[NPAGES];                            /* V2: EDIT opens on its sheet's first row (MACHINE 1; its big cards
+                                                       * are HOME's knob panel now) */
+        ui.page = rows_list(FAM_EDIT, r) ? r[0] : (uint8_t)page_first(FAM_EDIT);
     } else {
         uint32_t i = ui.fam_last[fam];
         ui.page = (uint8_t)(i && i < NPAGES && PAGES[i].fam == fam && page_visible(i) ? i : page_first(fam));
@@ -734,6 +740,60 @@ static void page_turn(int32_t dir)
     ui.page = (uint8_t)i;
     ui.fam_last[fam] = ui.page;
     ui.home = 0;
+    page_entered();
+}
+
+/* ------------------------------------------------------------- rows --- */
+/* V2 (2026-11-19, the plan 2026-11-19-rack-ui.md): the value pages are rows of a sheet, drawn as a list (ui_rows.c): the
+ * page shown (ui.page) is the focused row, 2U, which KNOB 1..4 edit as before; the rows round it show their values. A sheet is
+ * a family's pages, but EDIT's holds ENV's too (the synth on one or two screens): the machine and filter rows, the
+ * envelope's, then VOICE. ALGORITHM moves the focus along the sheet (the track is HOME's); a page button jumps to its
+ * family's row as before. EDIT's big cards (GR_BIG) are not a row: HOME's knob panel has them */
+static int row_page(uint32_t i)
+{
+    uint32_t f = PAGES[i].fam, g = PAGES[i].graph;
+    if (f != FAM_ENV && f != FAM_LFO && f != FAM_FX && f != FAM_SCL && f != FAM_EDIT && f != FAM_ARP)
+        return 0;
+    return g == GR_NONE || g == GR_ADSR || g == GR_LFO || g == GR_FX || g == GR_SCALE || g == GR_ARP || g == GR_SLCR ||
+           g == GR_MOD || g == GR_INS || g == GR_CHORD;
+}
+static int rows_view(void) { return !ui.home && !ui.layer && !page_over && row_page(ui.page); }
+static uint32_t row_sheet(uint32_t fam) { return fam == FAM_ENV ? (uint32_t)FAM_EDIT : fam; }
+static int row_voice(uint32_t i)                        /* EDIT's VOICE rows (and JUNO): after the envelope's */
+{
+    uint32_t id = PAGES[i].id[0];
+    return id == P_VOICE || id == P_ALLOC || id == P_SPRD || id == P_RSV_LN;
+}
+/* the rows of the sheet of family fam, in order (page indices; at most NPAGES): their count */
+static uint32_t rows_list(uint32_t fam, uint8_t *r)
+{
+    uint32_t s = row_sheet(fam), i, pass, n = 0;
+    for (pass = 0; pass < 3u; pass++)
+        for (i = 0; i < NPAGES; i++) {
+            uint32_t f = PAGES[i].fam;
+            if (!row_page(i) || !page_visible(i) || row_sheet(f) != s)
+                continue;
+            if (s == FAM_EDIT && (pass == 0u ? f != FAM_EDIT || row_voice(i) : pass == 1u ? f != FAM_ENV : f != FAM_EDIT || !row_voice(i)))
+                continue;
+            if (s != FAM_EDIT && pass)
+                continue;
+            r[n++] = (uint8_t)i;
+        }
+    return n;
+}
+/* ALGORITHM on a sheet: the next / previous row (no wrap) */
+static void rows_turn(int32_t dir)
+{
+    uint8_t r[NPAGES];
+    uint32_t n = rows_list(cur_page()->fam, r), at = 0, i;
+    for (i = 0; i < n; i++)
+        if (r[i] == ui.page)
+            at = i;
+    if (dir > 0 ? at + 1u >= n : at == 0u)
+        return;
+    ui.page = r[dir > 0 ? at + 1u : at - 1u];
+    ui.fam_last[PAGES[ui.page].fam] = ui.page;
+    ui.hot_t = 0;
     page_entered();
 }
 

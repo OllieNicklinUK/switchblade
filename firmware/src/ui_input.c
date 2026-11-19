@@ -447,6 +447,7 @@ static void sel_volume(int32_t s)
     param_format(d, t->p[P_LEVEL], v, &unit);
     fmt_named = 0;
     str_cpy(m + 7, v, sizeof m - 7);
+    ui.lvl_t = 40;                                       /* (the rack: the level over its scope) */
     ui_say(m, unit);
 }
 
@@ -1565,7 +1566,9 @@ static void ui_input(void)
     kq |= lay;
     if (!lay && (s = panel_enc(EN_PRESET)) != 0)
         presets_turn(s);
-    if (!lay && (s = panel_enc(EN_ALGO)) != 0)     /* ALGORITHM: the selected track, on every page */
+    if (!lay && (s = panel_enc(EN_ALGO)) != 0 && rows_view())   /* V2: on a sheet, ALGORITHM moves along its rows */
+        rows_turn(s);
+    else if (!lay && s)                               /* ALGORITHM: the selected track (HOME, the other pages) */
         track_select((uint32_t)clamp((int32_t)song.sel + (s > 0 ? 1 : -1), 0, NTRK - 1));
     if ((s = glo ? sel : panel_enc(EN_SELECT)) != 0) {   /* SELECT knob = the track's LEVEL (GLO + SELECT: the tempo); */
         if (!glo && sel_mode() >= SEL_MODW) {         /* MENU > SELECT MODW / VEL (1.5.6, #84): it plays */

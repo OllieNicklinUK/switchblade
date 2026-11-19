@@ -747,6 +747,10 @@ static void sound_name(const track_t *t, char *b)
 
 static void draw_foot(void)
 {
+    if (big_home() || rows_view()) {                  /* the rack (ui_rack.c), the rows (ui_rows.c): drawn where the footer was */
+        ui.foot_sig = 0;
+        return;
+    }
     char s[48], pn[16], ti[20], ln[24];
     const track_t *t = TSEL;
     uint32_t sig;
@@ -889,6 +893,10 @@ static void draw_columns(void)
     (void)motion_mask(song.sel, card_mot_mask);       /* (PLAY OFF: no scan) */
     if (ui.home) {                                   /* HOME: tabs, the sound, four cards (ui_big.c) */
         draw_home_big();
+        return;
+    }
+    if (rows_view()) {                               /* V2: a sheet's rows (ui_rows.c) */
+        draw_rows();
         return;
     }
     if (big_page()) {                                /* EDIT: four big cards (ui_big.c) */
@@ -1497,6 +1505,8 @@ static void ui_draw_page(uint32_t counting)
         ui.bpm_t--;
     if (ui.hot_t)
         ui.hot_t--;
+    if (ui.lvl_t)
+        ui.lvl_t--;
     if (ui.help_t)
         ui.help_t--;
     felucca_dbg.stage = 6;

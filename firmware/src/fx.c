@@ -942,6 +942,19 @@ static __attribute__((noinline)) void mix_spread(track_t *t, int32_t *b, uint32_
 
 /* one synth part into the dry mix and the sends; a part with no voice sounding costs
  * the LFO tick and a cleared buffer only (after the DIST tail has run out) */
+/* the rack's scope (ui_rack.c, the selected track's 2U unit): every other sample of the selected track's part, after its
+ * DIST, INSERT and SLICER, before its LEVEL, PAN and sends (its shape at any volume). A silent part writes nothing: the
+ * rack draws a flat line while its meter is down */
+#define SCOPE_TN 512u
+static int16_t scope_tb[SCOPE_TN];
+static uint32_t scope_tw;
+static __attribute__((noinline)) void scope_take_trk(const int32_t *b, uint32_t n)
+{
+    uint32_t i;
+    for (i = 1; i < n; i += 2u)
+        scope_tb[scope_tw++ & (SCOPE_TN - 1u)] = (int16_t)clamp(b[i] >> 2, -32767, 32767);
+}
+
 static void mix_part(track_t *t, uint32_t n)
 {
     int32_t *b = part_buf;
@@ -1003,6 +1016,8 @@ static void mix_part(track_t *t, uint32_t n)
         }
         t->peak = pk;
     }
+    if (t == &trk[song.sel % NTRK])
+        scope_take_trk(b, n);                           /* the rack's scope */
     if (pf.thr)
         perf_throw(t, b, send_d, send_r, n);            /* perform.c: REV / ECHO THROW (1.5.1), the sends towards full */
     if (mod.on)

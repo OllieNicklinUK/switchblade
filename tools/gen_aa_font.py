@@ -42,7 +42,7 @@ CODE = {0x2026: 0x85}                  # characters outside Latin-1 -> their one
 PHASES, PHASES_L = 4, 2                # horizontal phases per glyph (aa_raster.raster_font): S M, L
 # faces stored Huffman-coded (--huff): M and L. S, the most drawn and the least compressible (-15 %), stays
 # 2 px per byte, so the labels draw at full speed
-HUFF = [("M", "L", "XL")]
+HUFF = [("M", "L", "XL", "D", "DL", "DS")]
 # L draws "FELUCCA", the UPDATE MODE countdown digit, the calibration's control names (panel.c B_NAME / E_NAME),
 # MENU > LARGE's card values and page titles (ui_draw.c draw_column_tall, ui_graph.c graph_title), and VOID FOUR's
 # machine, category and preset names and the EDIT / HOME labels (ui_big.c): capitals A-Z, figures, # % + - . /;
@@ -51,6 +51,9 @@ HUFF = [("M", "L", "XL")]
 L_CHARS = " #%+-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 # XL: the EDIT cards' values (ui_big.c), 40 px figures and their signs only (ui_test.c: xl_face_has)
 XL_CHARS = "+-.0123456789"
+# D, DL: the rack's preset names (ui_big.c), Oswald SemiBold (SIL OFL 1.1): a condensed display face, capitals only.
+# D the 1U units' names, DL the selected (2U) unit's
+D_CHARS = " !#&'()+,-./0123456789:?ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def preset(name):
@@ -58,10 +61,14 @@ def preset(name):
         ASC_ADJ.update({"S": -1, "M": -1, "L": -1, "XL": -2})                         # Switch Blade's UI type: Exo 2 Medium (S M), SemiBold (L XL)
         v = str(FONTS.parent / "assets" / "fonts" / "Exo2-Medium.otf")         # SIL OFL 1.1, Google Fonts
         sb = str(FONTS.parent / "assets" / "fonts" / "Exo2-SemiBold.otf")
+        osw = str(FONTS.parent / "assets" / "fonts" / "Oswald[wght].ttf")   # SIL OFL 1.1, Google Fonts
         return [("S", v, 12, (32, 126), EXTRAS, 0.0, PHASES),
                 ("M", v, 15, (32, 126), EXTRAS, 0.0, PHASES),
                 ("L", sb, 28, (32, 32), [ord(c) for c in L_CHARS[1:]], 0.0, PHASES_L),
-                ("XL", sb, 40, (32, 32), [ord(c) for c in XL_CHARS], 0.0, PHASES_L)]
+                ("XL", sb, 40, (32, 32), [ord(c) for c in XL_CHARS], 0.0, PHASES_L),
+                ("D", osw + "@600", 16, (32, 32), [ord(c) for c in D_CHARS[1:]], 0.0, PHASES_L),
+                ("DL", osw + "@600", 32, (32, 32), [ord(c) for c in D_CHARS[1:]], 0.0, PHASES_L),
+                ("DS", osw + "@600", 10, (32, 32), [ord(c) for c in D_CHARS[1:]], 0.0, PHASES_L)]
     if name == "inter-tight":
         v = str(FONTS.parent / "assets" / "fonts" / "InterTight[wght].ttf")   # SIL OFL 1.1, Google Fonts
         return [("S", v + "@400", 12, (32, 126), EXTRAS, 0.0, PHASES),

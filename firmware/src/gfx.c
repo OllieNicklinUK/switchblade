@@ -78,6 +78,21 @@ static uint8_t cv_scroll;        /* 1: drawing a scrolled view (its text may run
 static int32_t cv_oy;            /* y offset for graph drawing */
 static int16_t cv_cy0, cv_cy1;   /* text clip: canvas rows cv_cy0 .. cv_cy1 - 1 (cv_begin: the whole canvas) */
 static uint8_t cv_flip;          /* cv_alpha_hc: the cell mirrored left <-> right (the header's metronome, ui_draw.c) */
+static uint16_t cv_mixc;         /* the rack (ui_rack.c): with cv_mixa, glyphs blend toward cv_mixc over the canvas, a glyph value v by
+                                  * v * cv_mixa / 16 (the glow round a name), not set from the ramp */
+static uint8_t cv_mixa;
+static uint16_t cv_mixpx(uint16_t s, uint32_t v)   /* canvas pixel s (byte-swapped) toward cv_mixc by v (0..15) x cv_mixa */
+{
+    uint32_t t = (v * cv_mixa * 273u + 2048u) >> 12,   /* (/ 15) */ a = ((uint32_t)s >> 8 | ((uint32_t)s & 0xFFu) << 8), b = cv_mixc;
+    uint32_t r, g, l;
+    if (t > 16u)
+        t = 16u;
+    r = (((a >> 11) * (16u - t) + (b >> 11) * t + 8u) >> 4);
+    g = ((((a >> 5) & 63u) * (16u - t) + ((b >> 5) & 63u) * t + 8u) >> 4);
+    l = (((a & 31u) * (16u - t) + (b & 31u) * t + 8u) >> 4);
+    a = r << 11 | g << 5 | l;
+    return (uint16_t)((a >> 8) | (a & 0xFFu) << 8);
+}
 
 #define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
 
@@ -368,7 +383,7 @@ static void cv_alpha(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint8_t
             uint32_t v = (d[k >> 1] >> ((k & 1u) ? 0 : 4)) & 15u;
             int32_t px = x + (int32_t)gx;
             if (v && (uint32_t)px < cv_w)
-                row[px] = rv[v];
+                row[px] = cv_mixa ? cv_mixpx(row[px], v) : rv[v];
         }
     }
     GFX_HOOK_PIXELS(w * h);
@@ -379,7 +394,7 @@ static void cv_alpha(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint8_t
  * its repeat count ((count - 1) << 4 | value: runs of zeros and 15s). Codes of up to 8 bits come from a
  * 256-entry table made once per font in RAM (symbol | length << 8; 0 = a longer code: bit by bit). The
  * stream is read in order, so rows outside the clip are decoded and dropped; a run spans rows */
-#define HC_FONTS 3                       /* the codes: the faces M and L (gen_aa_font.py HUFF), the icons (AI_HC) */
+#define HC_FONTS 6                       /* the codes: the faces M L XL and D DL DS (gen_aa_font.py HUFF; the rack), the icons (AI_HC) */
 static struct { const uint8_t *hc; uint16_t lut[256]; } hc_tab[HC_FONTS] __attribute__((section(".pool")));
 static const uint16_t *hc_lut(const uint8_t *hc)
 {
@@ -444,7 +459,7 @@ static void cv_alpha_hc(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint
                 uint32_t k;
                 for (k = 0; k < n; k++, px += dx)
                     if ((uint32_t)px < cv_w)
-                        row[px] = rv[v];
+                        row[px] = cv_mixa ? cv_mixpx(row[px], v) : rv[v];
             }
             gx += n;
             run -= n;

@@ -679,8 +679,15 @@ static void home_cards(void)
     cv_blit(0, HOME_CY);
 }
 
+#include "ui_rack.c"                                    /* V2: HOME is the rack */
+#include "ui_rows.c"                                    /* V2: the value pages as rows */
+
 static void draw_home_big(void)
 {
+    if (1) {                                            /* (V2, 2026-11-19: the rack; the 1.x HOME below kept for now) */
+        draw_rack();
+        return;
+    }
     uint32_t c;
     (void)motion_mask(song.sel, card_mot_mask);
     for (c = 0; c < 4u; c++)                            /* (no rolling digits here: a roll the last page left, done) */

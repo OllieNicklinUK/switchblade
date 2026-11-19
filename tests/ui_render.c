@@ -603,6 +603,9 @@ static void state(void)                          /* a playing song with steps on
     for (i = 0; i < SCOPE_N; i++)                 /* a stand-in signal for the scope */
         scope_buf[i] = (int16_t)((int32_t)((i * 37u) % 128u) * 200 - 12800 + (int32_t)((i % 32u) < 16u ? 3000 : -3000));
     scope_w = 0;
+    for (i = 0; i < SCOPE_TN; i++)                /* the rack's: a sine and its third (a pad's shape) */
+        scope_tb[i] = (int16_t)(9000.0 * sin(i * 0.0491) + 2500.0 * sin(i * 0.1473 + 0.6));
+    scope_tw = 0;
 }
 static void eng(uint32_t e) { set_engine_of(TSEL, e); }
 /* SONG's pictures (ui_graph.c sg_picture): four patterns that differ by slot k: T1 a bass line (accents on the
