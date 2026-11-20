@@ -7946,6 +7946,130 @@ static int test_head_group(void)
     return bad;
 }
 
+/* SCENES (2026-11-20, the scenes plan G.2; scene.c): GLOBAL's keys play nothing; OCT+ (SHIFT) + a white key saves the four
+ * parts (an empty slot at once, a full one after 1 s held); a white key recalls (stopped: at once, exactly as saved:
+ * sounds, steps, mutes, transposes, automation); PREV swaps with the state before; NEXT the next filled slot; black keys
+ * 1..4 mute; playing, a recall waits for the loop's end (the longest track's) and every track starts its step 1 there,
+ * in time (no step lost or doubled) */
+static void sc_tap(uint32_t k) { key_down(k); frame(); key_up(k); frame(); }
+static void sc_save(uint32_t w) { btn_down(B_OCTUP); frame(); sc_tap(white(w)); btn_up(B_OCTUP); frame(); }
+static int sc_same(const track_t *a)
+{
+    uint32_t k, ok = 1;
+    for (k = 0; k < NTRK; k++) {
+        uint32_t i, one = trk[k].eng_req == a[k].eng_req && trk[k].preset == a[k].preset &&
+                          !memcmp(trk[k].p, a[k].p, sizeof a[k].p) && !memcmp(trk[k].step, a[k].step, sizeof a[k].step);
+        if (!one) {                                     /* (what differs, for the log) */
+            printf("    scenes: T%u eng %u/%u preset %u/%u", k + 1u, trk[k].eng_req, a[k].eng_req, trk[k].preset, a[k].preset);
+            for (i = 0; i < P_COUNT; i++) if (trk[k].p[i] != a[k].p[i]) printf(" p%u %d/%d", i, trk[k].p[i], a[k].p[i]);
+            printf(" steps %s\n", memcmp(trk[k].step, a[k].step, sizeof a[k].step) ? "differ" : "same");
+        }
+        ok &= one;
+    }
+    return (int)ok;
+}
+static int test_scenes(void)
+{
+    static track_t ref[NTRK], ref2[NTRK];
+    int bad = 0, ok;
+    uint32_t k, n, len, loop, at, nv;
+    motion_store_t mref;
+    ui_power_on();
+    scene_boot();
+    go_page(GR_SCENE); frame();
+    nv = vage;                                         /* (a note on: the voices' age counter moves) */
+    sc_tap(white(0));
+    ok = song.grid == 3u && !scene_used(0) && msg_is("SCENE 01 EMPTY");
+    bad += check("scenes: GLOBAL's keys play nothing (grid 3); an empty slot: SCENE 01 EMPTY", ok && vage == nv);
+    my_steps(&trk[0]);
+    trk[0].p[P_E1] = 33; trk[2].p[P_MUTE] = 1; trk[1].p[P_TRANS] = 5;
+    set_engine_of(&trk[3], (trk[3].eng_req + 1u) % NENGINES);
+    motion_set_event(&trk[0], 3, P_REV, 90);
+    mref = motion;
+    memcpy(ref, trk, sizeof ref);
+    sc_save(0);
+    bad += check("scenes: OCT+ + F3 on an empty slot saves at once (SCENE 01 SAVED), OCT+ shifts no octave",
+                 scene_used(0) && scene_cur() == 0u && msg_is("SCENE 01 SAVED") && song.octave == 0);
+    track_defaults_steps(&trk[0]); trk[0].p[P_E1] = 90; trk[2].p[P_MUTE] = 0; trk[1].p[P_TRANS] = 0;
+    set_engine_of(&trk[3], ref[3].eng_req == 0u ? 1u : 0u);
+    motion_clear(&trk[0]);
+    memcpy(ref2, trk, sizeof ref2);
+    sc_tap(white(0));
+    ok = sc_same(ref) && !memcmp(&motion, &mref, sizeof motion) && msg_is("SCENE 01") && scene_cur() == 0u;
+    bad += check("scenes: F3 recalls it at once (stopped): sounds, machines, steps, mutes, transposes, automation", ok);
+    sc_tap(black(4));
+    ok = sc_same(ref2) && msg_is("PREVIOUS");
+    sc_tap(black(4));
+    bad += check("scenes: PREV (D#4) swaps with the state before the recall, again: back", ok && sc_same(ref));
+    trk[0].p[P_E1] = 50;
+    btn_down(B_OCTUP); frame(); key_down(white(0)); frames(500); key_up(white(0)); frame(); btn_up(B_OCTUP); frame();
+    sc_tap(white(0));
+    ok = trk[0].p[P_E1] == 33;
+    trk[0].p[P_E1] = 50;
+    btn_down(B_OCTUP); frame(); key_down(white(0)); frames(1100);
+    ok &= msg_is("SCENE 01 SAVED");
+    key_up(white(0)); frame(); btn_up(B_OCTUP); frame();
+    trk[0].p[P_E1] = 7;
+    sc_tap(white(0));
+    bad += check("scenes: a full slot saves only once held 1 s with OCT+ (let go before: nothing)", ok && trk[0].p[P_E1] == 50);
+    sc_tap(black(1));
+    ok = trk[1].p[P_MUTE] == 1;
+    sc_tap(black(1));
+    bad += check("scenes: black key 2 mutes / unmutes part 2", ok && trk[1].p[P_MUTE] == 0);
+    trk[0].p[P_E1] = 21;
+    sc_save(2);                                        /* slot 3 */
+    sc_tap(white(0));
+    sc_tap(black(6));                                  /* NEXT: slot 3 */
+    ok = scene_cur() == 2u && trk[0].p[P_E1] == 21;
+    sc_tap(black(6));                                  /* .. and round: slot 1 */
+    bad += check("scenes: NEXT (G#4) the next filled slot, wrapping", ok && scene_cur() == 0u && trk[0].p[P_E1] == 50);
+    /* playing: queued to the loop's end. T1 LEN 16, T2 LEN 12, T3 T4 LEN 8, all 1/16: T1's loop ends it */
+    for (k = 0; k < NTRK; k++) { trk[k].p[P_SDIV] = 2; trk[k].p[P_SLEN] = k == 0u ? 16 : k == 1u ? 12 : 8; trk[k].p[P_SSWING] = 0; }
+    sc_save(4);                                        /* slot 5: the same, P_E1 50 */
+    trk[0].p[P_E1] = 60;
+    for (k = 0; k < NTRK; k++) trk[k].p[P_SLEN] = k == 0u ? 16 : k == 1u ? 12 : 8;
+    sc_save(5);                                        /* slot 6: P_E1 60 */
+    sc_tap(white(4));                                  /* slot 5 now, stopped */
+    len = div_samples(2); loop = 16u * len;
+    seq_start(); events_block(32);
+    for (n = 32; n < 5u * len; n += 32) events_block(32);
+    sc_tap(white(5));                                  /* playing: queued */
+    ok = scene_queued() == 5u && trk[0].p[P_E1] == 50;
+    for (at = 0; n < 3u * loop && scene_cur() != 5u; n += 32) {
+        events_block(32);
+        if (trk[0].p[P_E1] == 50) at = n + 32u;        /* (the last block it was still the old) */
+        if (scn_due == 1u) frame();
+    }
+    ok &= scene_cur() == 5u && trk[0].p[P_E1] == 60 && at + 64u >= loop && at <= loop + 32u;
+    for (k = 0; k < 4u * 16u; k++) events_block(32), n += 32;
+    {   /* in time: T1 at (n - loop) into its pattern, to the block (+ the wait, at most a frame's blocks) */
+        uint32_t pos = (uint32_t)trk[0].seq_idx * len + trk[0].seq_pos, want = (n - loop) % loop;
+        ok &= pos + 32u * 4u >= want && pos <= want + 32u;
+        ok &= trk[1].seq_idx == (uint16_t)(((n - loop) / len) % 12u) || trk[1].seq_idx + 1u == (uint16_t)(((n - loop) / len) % 12u);
+    }
+    ok &= trk[0].cond_loop == 0u;                      /* (CONDITIONS: counted from the scene's first loop, as from PLAY) */
+    bad += check("scenes: playing, a recall waits for the longest track's loop (T1, 16 x 1/16), then every track from its "
+                 "step 1 there, in time; CONDITIONS from its loop 1", ok);
+    sc_tap(white(4));
+    ok = scene_queued() == 4u;
+    sc_tap(white(5));                                  /* the current slot with one queued: cancelled */
+    ok &= scene_queued() == SCN_NONE && msg_is("CANCELLED");
+    sc_tap(white(4)); sc_tap(white(2));                /* another key meanwhile: that one */
+    ok &= scene_queued() == 2u;
+    seq_stop(); frame();
+    bad += check("scenes: queued: the current slot cancels it, another key replaces it; STOP: at once",
+                 ok && scene_cur() == 2u && scene_queued() == SCN_NONE);
+    trk[0].p[P_E1] = 99;
+    seq_start(); events_block(32);
+    sc_save(7);
+    ok = scene_used(7) && (scene_mask() >> 16 >> 7 & 1u) == 0u;   /* (no flash on the host: nothing pending) */
+    seq_stop(); frame();
+    bad += check("scenes: OCT+ + a key while playing saves (the mirror at once)", ok && msg_is("SCENE 08 SAVED"));
+    ui_power_on();
+    scene_boot();
+    return bad;
+}
+
 /* the header's slot letter (ui_draw.c head_slot): the PROJECT slot of the selected track's pattern; "A*" edited since;
  * none at power-on and after a PHRASES pattern */
 static uint32_t head_ink_cols(int32_t x0, int32_t x1)  /* header columns x0..x1 with anything not BG */
@@ -8208,6 +8332,7 @@ int main(void)
     bad += test_menu_project_rows();
     bad += test_information();
     bad += test_head_slot();
+    bad += test_scenes();
     bad += test_product_ux();
     bad += test_page_cycles();
     bad += test_led();

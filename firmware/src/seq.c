@@ -194,6 +194,15 @@ static void seq_release(track_t *t);
 static void seq_stop(void);
 static uint32_t div_samples(uint32_t div);
 static uint32_t step_samples(const track_t *t, uint32_t period, uint32_t idx);
+/* SCENES (scene.c; the scenes plan, G.2): a recall while playing waits for the end of the loop (the longest track's, in
+ * time), as an Elektron pattern change does. The main loop arms it (scn_arm 1; 2: now, a Program Change on the
+ * pattern's boundary); this ISR, at the end, releases the sequenced notes, puts every track at its top and holds them
+ * (scn_due 1) while the main loop applies the scene (scene.c scene_poll: sounds, steps, automation); it hands them
+ * back (scn_due 2) and each track's step 1 starts as far in as the wait lasted (seq_top_carry), in time with the clock */
+static volatile uint8_t scn_arm;               /* main: 1 at the end of the loop, 2 at once; 0 none */
+static volatile uint8_t scn_due;               /* ISR: 1 the end came, the tracks wait; main: 2 applied, go on */
+static uint32_t scn_carry;                     /* ISR: samples since the end */
+static uint32_t seq_top_carry;                 /* ISR: where a track's step 1 starts at its top (0; a scene's carry) */
 static void rec_note(track_t *t, uint32_t note, uint32_t vel);
 static void rec_release(track_t *t, uint32_t note);
 static int rec_on(const track_t *t) { return ((song.rec >> trk_index(t)) & 1u) && song.playing; }
@@ -780,6 +789,60 @@ static void seq_start(void)
     perf_start();                                  /* perform.c: its 1/16 grid too */
 }
 
+/* the track whose loop ends the scene's wait: the longest in time (LEN x its DIV), the first of equals */
+static __attribute__((noinline)) uint32_t scn_clock(void)
+{
+    uint32_t k, best = 0, bl = 0;
+    for (k = 0; k < NTRK; k++) {
+        uint32_t l = (uint32_t)(trk[k].p[P_SLEN] > 0 ? trk[k].p[P_SLEN] : 1) * div_samples((uint32_t)trk[k].p[P_SDIV]);
+        if (l > bl) { bl = l; best = k; }
+    }
+    return best;
+}
+static void seq_release(track_t *t);
+/* once a block, before the tracks' ticks, while a scene is armed or due (scn_tick): 1 = the tracks wait (no tick this
+ * block). Not inlined: off the audio ISR's loop (the idle block pays one test) */
+static __attribute__((noinline)) int scn_tick_slow(uint32_t n)
+{
+    uint32_t k, carry = 0;
+    if (scn_due == 2u) {                           /* applied: go on, step 1 this far in */
+        seq_top_carry = scn_carry + n;
+        scn_due = 0;
+        return 0;
+    }
+    if (scn_due) {
+        scn_carry += n;
+        return 1;
+    }
+    if (!scn_arm)
+        return 0;
+    if (scn_arm == 1u) {                           /* the end of the loop: the clock track's last step ends in this block */
+        const track_t *t = &trk[scn_clock()];
+        uint32_t len;
+        if (t->seq_pos >= 0x7FFFFFFFu || t->seq_idx + 1u != (uint32_t)t->p[P_SLEN])
+            return 0;
+        len = step_samples(t, div_samples((uint32_t)t->p[P_SDIV]), t->seq_idx);
+        if (t->seq_pos + n < len)
+            return 0;
+        carry = t->seq_pos + n - len;
+    }
+    for (k = 0; k < NTRK; k++) {                   /* every track at its top, its notes let go */
+        track_t *t = &trk[k];
+        seq_release(t);
+        t->seq_idx = (uint16_t)(t->p[P_SLEN] - 1);
+        t->seq_pos = 0x7FFFFFFF;
+        t->rh_n = t->rskip_n = 0;
+        t->rat_left = 0;
+        t->nd_late = t->nd_early = ND_NONE;
+        t->nd_fired = 0;
+    }
+    scn_carry = carry;
+    scn_arm = 0;
+    scn_due = 1;
+    return 1;
+}
+static inline int scn_tick(uint32_t n) { return (scn_arm | scn_due) && song.playing ? scn_tick_slow(n) : 0; }
+
 static void seq_release(track_t *t)
 {
     uint32_t i;
@@ -794,6 +857,7 @@ static void seq_stop(void)
 {
     uint32_t i;
     song.playing = 0;
+    scn_arm = scn_due = 0;                         /* (a queued scene: scene.c applies it at once, stopped) */
     cin_left = 0;                                  /* (a count-in: cancelled, nothing recorded) */
     cin_flush = 0;
     memset(cin_n, 0, sizeof cin_n);
@@ -1093,7 +1157,7 @@ static void seq_tick(track_t *t, uint32_t n)
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
             break;
         top = t->seq_pos >= 0x7FFFFFFFu;            /* (PLAY: its first step) */
-        t->seq_pos = top ? 0u : t->seq_pos - cur_len;
+        t->seq_pos = top ? (seq_top_carry < cur_len ? seq_top_carry : 0u) : t->seq_pos - cur_len;
         t->seq_idx = (uint16_t)((t->seq_idx + 1u) % len);
         seq_enter(t, top, len);
         if (t->p[P_SQNT] && !t->nd_fired)
@@ -1315,8 +1379,10 @@ static void events_block(uint32_t n)
     }
     if (aud_req)
         seq_audition();                               /* (STEP PREVIEW: a step sounds, stopped) */
-    for (i = 0; i < NTRK; i++)
-        seq_tick(&trk[i], seq_n);
+    if (!scn_tick(seq_n))                            /* (a scene's switch: the tracks wait while it loads) */
+        for (i = 0; i < NTRK; i++)
+            seq_tick(&trk[i], seq_n);
+    seq_top_carry = 0;
     if (cin_flush)
         cin_record();
     if (song.playing)

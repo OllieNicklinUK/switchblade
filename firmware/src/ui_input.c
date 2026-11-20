@@ -294,13 +294,67 @@ static int idle_leds(void)
 /* the key LEDs, bit k = key k: NAME's keys, the layer's map, else the keys held and the notes the selected track's
  * sequencer, ARP and MIDI IN play, on STEP while stopped the cursor step's notes (#89; on SONG the key of the cell's
  * slot, 1.2) */
+/* GLOBAL's keys (song.grid 3; the scenes plan rev 6, section 3): a white key recalls its slot (1..16, F3 .. G5); with
+ * SHIFT (OCT+ held) it saves the four parts there: an empty slot at once, a full one once the key has been held 1 s
+ * (GK_HOLD_MS) with OCT+, instead of a dialog. Black keys 1..4 (F#3 G#3 A#3 C#4) mute / unmute parts 1..4 (P_MUTE, as GLO
+ * SET's); 5 (D#4) PREV, 6 (F#4) MUTATE (G.6: nothing yet), 7 (G#4) NEXT. FX held: the layer's (its effects, mutes) */
+#define GK_HOLD_MS 1000u
+static struct { uint16_t hold; uint8_t key[SCN_SLOTS]; uint32_t t0[SCN_SLOTS]; } gk;
+static void global_keys(uint32_t notes)
+{
+    uint32_t k, s, shift = (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u;
+    for (k = 0; k < 27u; k++) {
+        uint32_t p;
+        if (!((notes >> k) & 1u))
+            continue;
+        p = key_place(k);
+        if (!key_black(k)) {
+            if (!shift)
+                scene_recall(p);
+            else if (!scene_used(p))
+                scene_save(p);
+            else {                                      /* a full slot: hold it 1 s */
+                gk.hold |= (uint16_t)(1u << p);
+                gk.key[p] = (uint8_t)k;
+                gk.t0[p] = fm1_ms;
+                ui_message("HOLD TO SAVE OVER");
+            }
+        } else if (p < NTRK) {
+            trk[p].p[P_MUTE] = (int16_t)!trk[p].p[P_MUTE];
+            ui.force = 1;
+        } else if (p == 4u) {
+            scene_prev();
+        } else if (p == 6u) {
+            scene_next();
+        }
+    }
+    for (s = 0; gk.hold && s < SCN_SLOTS; s++) {
+        if (!((gk.hold >> s) & 1u))
+            continue;
+        if (!shift || !((fm1_in.notes >> gk.key[s]) & 1u))
+            gk.hold &= (uint16_t)~(1u << s);            /* let go first: nothing saved */
+        else if (fm1_ms - gk.t0[s] >= GK_HOLD_MS) {
+            gk.hold &= (uint16_t)~(1u << s);
+            scene_save(s);
+        }
+    }
+}
+/* .. their LEDs: the filled slots' white keys, the sounding parts' black keys */
+static uint32_t global_leds(void)
+{
+    uint32_t k, c = 0;
+    for (k = 0; k < 27u; k++)
+        if (key_black(k) ? key_place(k) < NTRK && !trk[key_place(k)].p[P_MUTE] : scene_used(key_place(k)))
+            c |= 1u << k;
+    return c;
+}
 static uint32_t key_leds(uint32_t *br)                 /* (*br: a layer's keys that breathe, layer_leds) */
 {
     uint32_t c;
     if (br)
         *br = 0;
     c = name_on() && !ui.menu ? name_leds() : ui.layer ? layer_leds(br) :
-                 (fm1_in.notes & ~kb_layer) | play_leds() | step_leds();
+                 global_keys_on() ? global_leds() : (fm1_in.notes & ~kb_layer) | play_leds() | step_leds();
     return c;
 }
 
@@ -1226,6 +1280,7 @@ static void ui_input(void)
     int32_t s, sel = 0, ks[4] = {0, 0, 0, 0};
     midi_take();                                        /* (MIDI IN notes: lights, SCREEN WAKE, AUTO SELECT's) */
     midi_pc_poll();                                     /* MIDI Program Change */
+    scene_poll();                                       /* GLOBAL: a queued scene, an unsaved one at STOP */
     perf_latch_on = fx_latch & 1u;                      /* (MENU > FX LATCH; a settings load sets it too) */
     fx_map_sync();                                      /* (the FX layer's key map: ui_layer.c, a settings load too) */
     fx_usb_fixed = (ui_prefs & PREF_USB_FIXED) != 0u;   /* (MENU > USB LEVEL: fx.c, audio.c) */
@@ -1426,6 +1481,8 @@ static void ui_input(void)
         case B_OCTDN:
         case B_OCTUP: {
             uint32_t both = (1u << panel.btn[B_OCTDN]) | (1u << panel.btn[B_OCTUP]);
+            if (global_keys_on())                       /* GLOBAL: OCT+ is SHIFT (global_keys), OCT- nothing */
+                break;
             if (act_cols() || layer_set_open() || ui.ml.on)   /* action pages: enter / back (below); SET layers: OCT-; */
                 break;                                  /* MIDI LEARN: clear / done (below) */
             if ((fm1_in.buttons & both) == both) {
@@ -1466,7 +1523,7 @@ static void ui_input(void)
     }
     song.grid = (uint8_t)keys_mode();                 /* (seq.c: what the keys are) */
     if (song.grid == 3u) {
-        ;                                               /* GLOBAL: the scene keys come with the scenes plan's G.2 */
+        global_keys(notes);                             /* GLOBAL: the scenes */
     } else if (!song.grid && song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */
         if (live_rec_sel() || !((song.rec >> song.sel) & 1u))   /* armed and playing: the keys record live, not
                                                          * into the cursor step too; not armed (1.2, #133): they

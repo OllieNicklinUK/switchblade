@@ -743,4 +743,5 @@ static int autosave_boot(int allowed)
 _Static_assert(sizeof(project_store_t) <= ST_PAYLOAD_MAX, "project does not fit one flash sector");
 _Static_assert(sizeof(persist_t) <= ST_PAYLOAD_MAX, "settings do not fit one flash sector");
 #endif
+#include "scene.c"                                    /* GLOBAL's scenes: FOR4 images (2026-11-20) */
 #endif /* PROJ_HOST */

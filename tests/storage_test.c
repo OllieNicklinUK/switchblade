@@ -107,16 +107,32 @@ int main(void)
     /* the autosave (1.2, project.c): its own pair 0xE5000 / 0xE6000, above the OTA staging, apart from every other
      * object; a save there touches no other object */
     {
-        uint32_t o, c, ok = OBJ_AUTOSAVE == OBJ_COUNT - 1 && st_sector(OBJ_AUTOSAVE, 0) == 0xE5000u &&
+        uint32_t o, c, ok = OBJ_AUTOSAVE == OBJ_SCENE0 - 1 && st_sector(OBJ_AUTOSAVE, 0) == 0xE5000u &&
                                st_sector(OBJ_AUTOSAVE, 1) == 0xE6000u;
         static uint8_t snap[0x100000];
-        for (o = 0; o < OBJ_AUTOSAVE; o++)
-            for (c = 0; c < 2u; c++)
+        for (o = 0; o < OBJ_COUNT; o++)
+            for (c = 0; c < 2u && o != OBJ_AUTOSAVE; c++)
                 ok &= st_sector(o, c) + 4096u <= 0xE5000u || st_sector(o, c) >= 0xE7000u;
         memcpy(snap, nor, sizeof nor);
         ok &= st_save(OBJ_AUTOSAVE, a, sizeof a) == 0 && st_load(OBJ_AUTOSAVE, got, sizeof got) == (int)sizeof a &&
               !memcmp(got, a, sizeof a) && !memcmp(snap, nor, 0xE5000u) && !memcmp(snap + 0xE7000u, nor + 0xE7000u, 0x19000u);
         bad += check("the autosave in its own sectors 0xE5000 / 0xE6000, nothing else touched", ok);
+    }
+    {   /* the scenes (2026-11-20, scene.c): 16 A/B pairs at 0x9F000 .. 0xBEFFF, after the projects, apart from every other
+         * object, in the store's range; a save there touches nothing else */
+        uint32_t o, c, k, ok = OBJ_COUNT == OBJ_SCENE0 + 16u && st_sector(OBJ_SCENE0, 0) == 0x9F000u &&
+                                st_sector(OBJ_SCENE0 + 15u, 1) + 4096u == 0xBF000u &&
+                                st_sector(OBJ_PROJECT0 + 3, 1) + 4096u <= 0x9F000u;
+        static uint8_t snap[0x100000];
+        for (o = OBJ_SCENE0; o < OBJ_COUNT; o++)
+            for (c = 0; c < 2u; c++)
+                for (k = 0; k < OBJ_SCENE0; k++)
+                    if (k != 7u && k != 8u)
+                        ok &= st_sector(k, 0) != st_sector(o, c) && st_sector(k, 1) != st_sector(o, c);
+        memcpy(snap, nor, sizeof nor);
+        ok &= st_save(OBJ_SCENE0 + 15u, a, sizeof a) == 0 && st_load(OBJ_SCENE0 + 15u, got, sizeof got) == (int)sizeof a &&
+              !memcmp(snap, nor, st_sector(OBJ_SCENE0 + 15u, 0)) && !memcmp(snap + 0xBF000u, nor + 0xBF000u, 0x41000u);
+        bad += check("the 16 scenes: A/B pairs 0x9F000 .. 0xBEFFF, apart from every other object, a save touches nothing else", ok);
     }
     {
         uint8_t copies[2 * ST_SECTOR];

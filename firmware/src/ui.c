@@ -27,6 +27,15 @@ static void up_ui_named(uint32_t op, uint32_t k, const char *name, uint32_t cat)
 static uint32_t up_cat(uint32_t k);
 static int project_save_as(uint32_t slot, const char *name);
 static int project_name(uint32_t slot, char *b);
+static void scene_recall(uint32_t s);            /* GLOBAL's scenes: scene.c */
+static void scene_save(uint32_t s);
+static void scene_next(void);
+static void scene_prev(void);
+static void scene_poll(void);
+static int scene_used(uint32_t s);
+static uint32_t scene_cur(void);
+static uint32_t scene_queued(void);
+static uint32_t scene_mask(void);
 static int project_rename(uint32_t slot, const char *name);
 static int project_erase(uint32_t slot);
 static void project_cur_name(char *b);

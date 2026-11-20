@@ -12,6 +12,7 @@
 #define NPART 4                  /* synth parts: tracks 1..4 */
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
+#define SCN_SLOTS 16u            /* GLOBAL's scenes (scene.c; storage.c OBJ_SCENE0..) */
 #define HALF_FRAMES 128          /* I2S half buffer: 2.9 ms at 44.1 kHz (a key waits 0..1 half, then plays 1 half later) */
 #define NENGINES 8u              /* V2: the eight machines (engines.c ENGINES[]); ids 0..7 are stored: never reorder */
 #define NENG_SHOWN 8u            /* the engines one can pick, in engines.c ENGINE_ORDER */

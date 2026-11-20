@@ -599,6 +599,8 @@ static uint32_t graph_signature(void)
         h ^= (mod_ui_slot + 1u) * 40503u;
     if (pg->graph == GR_SLCR && t->p[P_SLCR])        /* the SLICER's step playing */
         h ^= (sl[song.sel].idx + 1u) * 2654435761u;
+    if (pg->graph == GR_SCENE)                       /* GLOBAL: the scene now, queued, the filled / unsaved slots */
+        h ^= (scene_cur() + 1u) * 40503u + (scene_queued() + 1u) * 7919u + scene_mask() * 2654435761u;
     if (pg->graph == GR_SLOTS) {                     /* (a checksum over each slot) */
         for (i = 0; i < 4u; i++)
             h ^= (uint32_t)graph_project_used(i) << (20u + i);
@@ -1171,7 +1173,17 @@ static void graph_scope(uint16_t c)
 /* GLOBAL (2026-11-20): the scene grid and the effect chips come with the scenes plan's G.4; until then a note */
 static void graph_scene(void)
 {
-    panel_note("GLOBAL", "SCENES", "COMING NEXT");
+    char a[12] = "SCENE --", b[16] = "", c[20] = "";
+    uint32_t cur = scene_cur(), q = scene_queued(), m = scene_mask(), s, n = 0;
+    if (cur < SCN_SLOTS) { a[6] = (char)('0' + (cur + 1u) / 10u); a[7] = (char)('0' + (cur + 1u) % 10u); }
+    if (q < SCN_SLOTS) {
+        str_cpy(b, "NEXT 00", sizeof b);
+        b[5] = (char)('0' + (q + 1u) / 10u); b[6] = (char)('0' + (q + 1u) % 10u);
+    }
+    for (s = 0; s < SCN_SLOTS; s++) n += (m >> s) & 1u;
+    fmt_int(c, (int32_t)n);
+    str_cpy(c + str_len(c), (m >> 16) ? " SAVED, NOT ALL" : " SAVED", sizeof c - str_len(c));
+    panel_note(a, b[0] ? b : 0, c);                   /* (the grid and the chips: G.4) */
 }
 
 static void draw_graph(void)

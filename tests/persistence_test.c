@@ -298,6 +298,45 @@ static int autosave_test(void)
     return bad;
 }
 
+/* the scenes (2026-11-20, scene.c): a save while stopped writes its A/B record at once; while playing the mirror only,
+ * the flash at STOP (scene_poll); power-on (scene_boot) reads the bank back, the same sounds and steps; a sector with no
+ * valid record (the retired user samples' old bytes) is an empty slot */
+static int scenes_test(void)
+{
+    int bad = 0, ok;
+    uint32_t e0, i;
+    int16_t p1;
+    step_t st[NSTEP];
+    reset();
+    scene_boot();
+    for (i = 0; i < 4096u; i++) nor[st_sector(OBJ_SCENE0 + 6u, 0) + i] = (uint8_t)(i * 13u + 7u);   /* old bytes */
+    trk[0].p[P_E1] = 77; trk[0].step[3].n = 1; trk[0].step[3].note[0] = 64; trk[0].step[3].time = ST_NOTE;
+    p1 = trk[0].p[P_E1]; memcpy(st, trk[0].step, sizeof st);
+    e0 = erases;
+    scene_save(2);
+    ok = scene_used(2) && erases == e0 + 1u && st_load(OBJ_SCENE0 + 2u, &proj_wire, sizeof proj_wire) == (int)PROJ_STORE_SIZE;
+    bad += check("scenes: a save while stopped writes its record at once (one erase)", ok);
+    song.playing = 1;
+    trk[0].p[P_E1] = 55;
+    e0 = erases;
+    scene_save(4);
+    scene_poll();
+    ok = scene_used(4) && erases == e0 && (scene_mask() >> 16 >> 4 & 1u);
+    song.playing = 0;
+    scene_poll();
+    ok &= erases == e0 + 1u && !(scene_mask() >> 16);
+    bad += check("scenes: saved while playing: the mirror now, no erase; STOP: written", ok);
+    trk[0].p[P_E1] = 1; memset(trk[0].step, 0, sizeof trk[0].step);
+    scene_boot();                                       /* power-on: from the flash */
+    ok = scene_used(2) && scene_used(4) && !scene_used(6) && (scene_mask() & 0xFFFFu) == ((1u << 2) | (1u << 4));
+    scene_recall(2);
+    ok &= trk[0].p[P_E1] == p1 && !memcmp(trk[0].step, st, sizeof st);
+    scene_recall(4);
+    ok &= trk[0].p[P_E1] == 55;
+    bad += check("scenes: power-on reads the bank back (the same sounds and steps); old bytes in a sector: empty", ok);
+    return bad;
+}
+
 int main(void)
 {
     int bad = 0, ok;
@@ -582,6 +621,7 @@ int main(void)
     bad += check("PLAY consumed before the settings snapshot defers the write",
                   irq_races == 3u && song.playing && !transport_req && persist_pending && erases == before);
     bad += autosave_test();
+    bad += scenes_test();
     printf("%s\n", bad ? "PERSISTENCE TEST FAILED" : "persistence test passed");
     return bad != 0;
 }
