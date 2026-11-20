@@ -673,6 +673,15 @@ static void __attribute__((noinline)) midi_route_block(void)
  * next. MENU > MIDI > PC IN OFF: the main loop discards both (ui.c midi_pc_poll) */
 static volatile uint8_t *const mpc_io;
 static volatile uint8_t *const mbank_io;
+/* SCENES' channel (the scenes plan rev 6, G.3): on channel 16, before ROUT's block filter, a Program Change selects scene
+ * PC mod 16 (an Elektron's PROG CH SEND on CH 16: pattern A01 .. A16, B.. wrapping; at once, it comes on the pattern's
+ * boundary), CC 85 a scene 0..15 (mod 16; as a GLOBAL key: playing, at the loop's end) and CC 86 the MORPH (G.6). Only
+ * these three: channel 16's notes and its other messages go on as ROUT says (with CH13-16 or TRACK part 4 still plays
+ * there; its Program Change there is a scene's now). Noted here, 0x80 | value, for the main loop (scene.c scene_poll) */
+#define SCN_MIDI_CH 15u
+#define CC_SCENE 85u
+#define CC_MORPH 86u
+static volatile uint8_t scn_mpc, scn_mcc, scn_mmorph;
 
 /* Keep the occasional controller/panic dispatch outside the hot rendering loop. Channel voice messages only
  * (realtime and clock are handled in events_block, SysEx never reaches here). With ROUT CH1-4 channels
@@ -680,6 +689,15 @@ static volatile uint8_t *const mbank_io;
  * channel aftertouch, Program Change, so they stay free for other instruments. */
 static void __attribute__((noinline)) midi_event(uint32_t st, uint32_t ch, uint32_t d1, uint32_t d2)
 {
+    if (ch == SCN_MIDI_CH && (st == 0xC0u || (st == 0xB0u && (d1 == CC_SCENE || d1 == CC_MORPH)))) {
+        if (st == 0xC0u)
+            scn_mpc = (uint8_t)(0x80u | d1);
+        else if (d1 == CC_SCENE)
+            scn_mcc = (uint8_t)(0x80u | d2);
+        else
+            scn_mmorph = (uint8_t)(0x80u | d2);
+        return;
+    }
     if (song.g[G_ROUTE] != 1 && !midi_in_block(ch))
         return;
     if (st == 0x90u || st == 0x80u)

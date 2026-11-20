@@ -225,8 +225,22 @@ static void scene_save(uint32_t s)
 
 /* main loop, once a pass: a queued scene at the loop's end (or at once, stopped meanwhile), then one unsaved slot to
  * the flash when stopped */
+static uint8_t scn_morph;                             /* CC 86 on channel 16 (0..127): MORPH's amount (G.6 plays it) */
 static void scene_poll(void)
 {
+    uint32_t v;
+    fm1_irq_off();                                    /* channel 16 (midi_control.c): a PC, CC 85, CC 86 */
+    v = (uint32_t)scn_mpc << 16 | (uint32_t)scn_mcc << 8 | scn_mmorph;
+    scn_mpc = scn_mcc = scn_mmorph = 0;
+    fm1_irq_on();
+    if (v & 0x80u)
+        scn_morph = (uint8_t)(v & 127u);
+    if (!(ui_prefs2 & (PREF_PCIN_OFF >> 16))) {       /* (MENU > MIDI > PC IN OFF: scenes' too) */
+        if ((v >> 16) & 0x80u)
+            scene_recall_now((v >> 16) & 15u);        /* Program Change: at once (on the controller's boundary) */
+        if ((v >> 8) & 0x80u)
+            scene_recall((v >> 8) & 15u);             /* CC 85: as a key */
+    }
     if (scn.q != SCN_NONE) {
         if (scn_due == 1u) {                          /* the tracks wait at their top: load it, hand them back */
             uint32_t s = scn.q;

@@ -1286,10 +1286,56 @@ static int test_mout_review(void)
     midi_test_reset();
     return bad;
 }
+/* SCENES' channel (2026-11-20, the scenes plan G.3): on channel 16, before ROUT, a Program Change recalls scene PC mod 16
+ * at once (A01 .. A16; B01 again 1), CC 85 a scene as a GLOBAL key (playing: at the loop's end), CC 86 the MORPH amount;
+ * parts 1..4's channels untouched; with CH13-16 part 4 still plays channel 16's notes and its CC 102 (E0); PC IN OFF:
+ * none of them */
+static int scenes_midi_test(void)
+{
+    int bad = 0, ok;
+    uint32_t k;
+    midi_test_reset();
+    scene_boot();
+    trk[0].p[P_E1] = 40; scene_save(2);
+    trk[0].p[P_E1] = 70; scene_save(5);
+    trk[0].p[P_E1] = 1;
+    queued(0xCFu, 18u, 0, 1);                           /* PC 19 (B03) on channel 16: scene 3 */
+    for (k = 0, ok = 1; k < NTRK; k++) ok &= !ui.mpc[k];
+    scene_poll();
+    bad += check("scenes: channel 16 PC 18 recalls scene 3 (PC mod 16), no part takes the PC", ok && scene_cur() == 2u &&
+                 trk[0].p[P_E1] == 40);
+    queued(0xBFu, CC_SCENE, 5u, 1); scene_poll();
+    bad += check("scenes: channel 16 CC 85 = 5: scene 6", scene_cur() == 5u && trk[0].p[P_E1] == 70);
+    queued(0xBFu, CC_MORPH, 99u, 1); scene_poll();
+    bad += check("scenes: channel 16 CC 86: the MORPH amount (G.6 plays it)", scn_morph == 99u);
+    queued(0xC0u, 2u, 0, 1); midi_pc_poll(); scene_poll();
+    bad += check("scenes: a PC on channel 1 is part 1's (a sound), not a scene", scene_cur() == 5u && trk[0].preset == 2u);
+    song.g[G_ROUTE] = 4;                                 /* CH13-16: part 4 on channels 13..16 */
+    queued(0x9Fu, 60u, 100u, 1);
+    ok = gate_note(&trk[3], 60);
+    queued(0x8Fu, 60u, 0, 1);
+    queued(0xBFu, 102u, 99u, 1);
+    bad += check("scenes: ROUT CH13-16: channel 16's notes and CC 102 are still part 4's", ok && trk[3].p[P_E0] != 0 &&
+                 scene_cur() == 5u);
+    song.g[G_ROUTE] = 0;
+    ui_prefs2 |= PREF_PCIN_OFF >> 16;
+    queued(0xCFu, 2u, 0, 1); scene_poll();
+    ui_prefs2 &= ~(PREF_PCIN_OFF >> 16);
+    bad += check("scenes: MENU > MIDI > PC IN OFF: channel 16's PC ignored too", scene_cur() == 5u);
+    seq_start(); events_block(CTL);
+    queued(0xCFu, 2u, 0, 1); scene_poll();
+    ok = scn_arm == 2u || scn_due != 0u;
+    events_block(CTL); scene_poll(); events_block(CTL);
+    bad += check("scenes: playing, channel 16's PC switches at once (the next block), from step 1", ok && scene_cur() == 2u &&
+                 trk[0].seq_idx == 0u);
+    seq_stop();
+    scene_boot();
+    return bad;
+}
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + clock_arp_and_boundaries() +
               arp_ext_stop_test() + usb_burst_test() + route_test() + route_block_test() + route_track_test() + follow_test() + cc_map_test() + test_cc_contract() + learn_test() + pc_test() + test_mout() + test_mout_review() +
-              v2_midi_test();
+              v2_midi_test() + scenes_midi_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
