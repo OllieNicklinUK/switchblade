@@ -23,9 +23,15 @@
  * ever while the stock firmware runs: a later Felucca finds no valid copy and starts as without one). Object types 7
  * and 8 were the retired FM6 patch objects (their sectors 0x9F000 / 0xFE000, the user sample slots 0xA0000..0xDBFFF
  * and the FM6 voice bank 0xE7000 are unused now): the autosave keeps its type 9 */
-enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_AUTOSAVE = OBJ_UPRESET0 + 4, OBJ_COUNT };
+/* (2026-11-20, the scenes plan) the 16 GLOBAL scenes (scene.c): types 10..25, A/B at 0x9F000 .. 0xBEFFF, in the retired
+ * user sample slots' space (nothing reads it since; a sector there that holds no valid record reads as an empty scene) */
+#ifndef SCN_SLOTS
+#define SCN_SLOTS 16u                                  /* (core.h's; storage_test builds this file alone) */
+#endif
+enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_AUTOSAVE = OBJ_UPRESET0 + 4, OBJ_SCENE0,
+       OBJ_COUNT = OBJ_SCENE0 + SCN_SLOTS };
 /* an object there is (not the retired types 7, 8) */
-static int st_obj_bad(uint32_t obj) { return obj >= OBJ_COUNT || (obj > OBJ_UPRESET0 + 1u && obj != OBJ_AUTOSAVE); }
+static int st_obj_bad(uint32_t obj) { return obj >= OBJ_COUNT || (obj > OBJ_UPRESET0 + 1u && obj < OBJ_AUTOSAVE); }
 
 typedef struct {
     uint32_t magic;
@@ -61,6 +67,8 @@ static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy 
         return 0xFC000u + copy * ST_SECTOR;
     if (obj == OBJ_AUTOSAVE)
         return 0xE5000u + copy * ST_SECTOR;
+    if (obj >= OBJ_SCENE0)
+        return 0x9F000u + (obj - OBJ_SCENE0) * 2u * ST_SECTOR + copy * ST_SECTOR;
     if (obj >= OBJ_UPRESET0)
         return 0xDC000u + (obj - OBJ_UPRESET0) * 2u * ST_SECTOR + copy * ST_SECTOR;
     return 0x97000u + (obj - OBJ_PROJECT0) * 2u * ST_SECTOR + copy * ST_SECTOR;

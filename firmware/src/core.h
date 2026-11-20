@@ -12,6 +12,7 @@
 #define NPART 4                  /* synth parts: tracks 1..4 */
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
+#define SCN_SLOTS 16u            /* GLOBAL's scenes (scene.c; storage.c OBJ_SCENE0..) */
 #define HALF_FRAMES 128          /* I2S half buffer: 2.9 ms at 44.1 kHz (a key waits 0..1 half, then plays 1 half later) */
 #define NENGINES 8u              /* V2: the eight machines (engines.c ENGINES[]); ids 0..7 are stored: never reorder */
 #define NENG_SHOWN 8u            /* the engines one can pick, in engines.c ENGINE_ORDER */
@@ -381,8 +382,8 @@ _Static_assert(sizeof(track_t) % 16u == 0, "track_t: a multiple of 16 bytes (a c
 typedef struct {
     int16_t g[G_COUNT];
     uint8_t playing, seq_mode;
-    uint8_t grid;                /* the keys' mode: 0 they play; 2: NAME (ui_name.c): no key plays; 3: SONG, A..D are
-                                  * its (seq.c song_key). (1 was the retired DRUM grid) */
+    uint8_t grid;                /* the keys' mode: 0 they play; 2: NAME (ui_name.c): no key plays; 3: GLOBAL (2026-11-20):
+                                  * no key plays, they are the screen's. (1 was the retired DRUM grid; 3 SONG's A..D) */
     uint8_t rec;                 /* live recording armed: bit per track */
     uint8_t sel;                 /* selected track 0..NTRK-1: keys, pages, editor */
     int8_t octave;

@@ -129,3 +129,30 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - WAVE: +4 dB after the clipper (`VOID_POST`: the clipper and filter unchanged); the four stabs swapped for V2's ACID TECHNO, SUB SAW LAYR, SUB STAB TEK, REESE WOBBLE (KEYS 10, BASS 18). VOWEL's corner DC bound 2 -> 2.5 % (the corner now reaches the master's limiter).
 - Tests: `jpz_test.c` and `cz_test.c` pin their scenarios to the first voicing's TRANCE LEAD / CZ BASS / CZ BRASS (the banks changed under them); the WAVE scenario hashes re-recorded. Goldens, union, CPU and budget: only these four machines' entries (plus the two four-machine mixes and the switch sequences). All host tests pass.
 - Levels (preset audit, dBFS median): WAVE -13.4 (was -18.4), JUNO -12.7, JP-Z -12.0, CZ-Z -15.6. Image 473,400 B; RAM unchanged.
+
+## JP-Z bank: Roland factory + Alan Marcero (2026-11-20)
+
+- JP-Z's 50: 21 of Roland's JP-8000 factory patches, the user's choice (singles S006 S007 S008 S010 S011 S028..S031 S073..S080 S096, performance parts P01U P12U P28L), read from the JP-8000 v1.05 firmware ROM (`../ROMS/jp8000_v1.05.bin`, not in the repo: single patches at 0x562B6, 160 bytes; performances at 0x5B2B6, 0x180 bytes, Upper +0x40, Lower +0xE0; bytes 0x00..0x49 are the SysEx patch layout, the rest internal: converted with VELOCITY off), and 29 of Alan Marcero's (18 leads, 4 atmos, 3 keys, 4 bass). `tools/jpz_presets.py` replaces `tools/jpz_alan_presets.py` (the same conversion). Categories LEAD 18, ATMOS 13, KEYS 10, BASS 9.
+- Every JP-Z name is at most 10 characters (the home screen's large type); the other machines' names are unchanged (12).
+- Goldens and the CPU baseline: only the JP-Z preset entries re-recorded. Roland's factory data: settle the licensing before the repo goes public (as CZ-Z).
+
+## Scenes plan G.1: SONG leaves GLOBAL (2026-11-20)
+
+- `d:\Switchblade\2026-11-20-scenes-and-performance.md` rev 6. GLO's only page is **GLOBAL** (`GR_SCENE`, a placeholder until G.4); the keyboard plays no notes there (`song.grid` 3: every key the screen's). The SONG page, its timeline, the A..D keys, TOOLS' DELETE ROW / CLEAR SONG, the header's song disc and section, and song playback are gone.
+- `song_chain.c` stays in the tree, out of the build. `chain_busy()` is a stub (0) until its guards go. FOR4 unchanged: a save writes default chain bytes, a load still checks them, so every older project loads as before. Editor command 33 SONG keeps its reply shape, refuses every set / start (rc 1), op 3 still stops (`web/EDITOR_PROTOCOL.md`).
+- Image 462,704 B (-10.7 KB); RAM .data+.bss 32,020 B (-13.3 KB: the song's four pattern sources, for the scenes' buffers).
+- Tests retired with SONG: ui_test `test_chain`, `test_song_timeline`, `test_song_lanes`, `test_song_lanes_drawn`, `test_song_pictures`, `chain_screens` and the "while a song plays" checks; motion_test's song motion / locks; seq155 `cond_song` (a scene variant comes with G.2); persistence's pending-SONG and song-source checks; detail_test's song check; ui_render's 16 SONG screens (S_GLOBAL in their place) and its SONG band lint. editor_test's SONG test rewritten for the retired reply. Goldens unchanged (0 changed); all host tests pass.
+
+## Scenes plan G.2: the scenes (2026-11-20)
+
+- `firmware/src/scene.c` (included at the end of `project.c`): 16 slots, one bank for the device. A scene is a FOR4 image (`project_capture` + `proj_pack`: every parameter, engine, preset, the steps, the automation; mutes and transposes are parameters; the TRANCE GATE pattern in the unused chain bytes, row 15). Mirrored in `.pool` (16 x 3840 B + the PREV state + a decode buffer), read at power-on (`scene_boot`, main.c).
+- Storage: `OBJ_SCENE0` .. +15 (types 10..25), A/B pairs at 0x9F000 .. 0xBEFFF (the retired user-sample space; a sector with no valid record reads as empty). A save stopped writes at once; playing, the mirror only (msg2 TO FLASH AT STOP), written at STOP by `scene_poll`.
+- GLOBAL's keys (`ui_input.c global_keys`): a white key recalls; OCT+ (SHIFT) + a white key saves (empty at once, full after 1 s held); black 1..4 mute parts 1..4, 5 PREV (swaps with the state before the last recall), 7 NEXT (the next filled slot); 6 MUTATE is G.6. OCT+/- shift no octave on GLOBAL. LEDs: filled slots, sounding parts. The page shows the scene now / queued / count until G.4's grid.
+- Playing, a recall is queued to the end of the longest track's loop (`seq.c scn_tick`, LEN x DIV): the tracks wait at their top while the main loop applies it, then start step 1 with the wait carried (in time with the clock; CONDITIONS from the scene's loop 1). The current slot cancels a queued one, another key replaces it, STOP applies it at once. `scn_tick_slow` is noinline: the audio ISR's static cost stays in budget (`tests/target_budget.py`).
+- Image 465,820 B (+3.1 KB); RAM 32,100 B; pool 349,040 of 368,640 B (19.6 KB spare, floor 8 KB).
+- Tests: ui_test `test_scenes` (keys silent, save / recall exact, PREV, the 1 s hold, mutes, NEXT, the loop-end switch in time, cancel / replace / STOP, save while playing); persistence_test `scenes_test` (flash at once / at STOP, power-on read back, old bytes read empty); storage_test (the scenes' sectors apart from every other object). All host tests pass; goldens unchanged.
+
+## Scenes plan G.3: channel 16 (2026-11-20)
+
+- `midi_control.c midi_event`: on channel 16, before ROUT's block filter, a Program Change selects scene PC mod 16 at once (an Elektron's PROG CH SEND on CH 16: A01..A16, later banks wrapping; playing, the next block, every track from step 1), CC 85 a scene (mod 16) as a GLOBAL key (playing: at the loop's end), CC 86 the MORPH amount (kept for G.6). Only these three: channel 16's notes and its other CCs go on as ROUT says (CH13-16 / TRACK: part 4 still plays there), a narrower take than rev 6's "channel 16 taken". MENU > MIDI > PC IN OFF ignores the scenes' PC and CC 85 too.
+- Tests: midi_control_test `scenes_midi_test` (PC mod 16, CC 85, CC 86, channel 1's PC still a sound, CH13-16 notes / CC 102 still part 4's, PC IN OFF, playing: at once from step 1).

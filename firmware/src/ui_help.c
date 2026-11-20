@@ -36,7 +36,7 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
     {"VOICE 2", "[K2]DETUNE[K3]PAN[K4]MUTE"},
     {"VOICE 3", "[K1]STEREO SPREAD[EDIT]EDIT"},
     {"JUNO", "[K1]CHORUS OFF I II I+II[EDIT]EDIT"},
-    {"SONG", "[K1]SECTION[KEYS]A-D[PLAY]SONG"},
+    {"GLOBAL", "[GLO]HOLD: SET[FX]HOLD: EFFECTS"},   /* (2026-11-20; the scenes' hint with G.4) */
     {"USER", "[K1]SLOT[OCT+]SAVE[SAVE]PRESETS"},
     {"PRESETS", "[K2]ENGINE[K3]FAV[K4]LIST"},
     {"PHRASES", "[K1]PHRASE[OCT+]LOAD[SAVE]PROJECT"},

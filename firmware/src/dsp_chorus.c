@@ -163,7 +163,9 @@ static int chorus_block_i(chorus_t *c, uint32_t req, const int32_t *in, int32_t 
                     l[i] = r[i] = in[i];
                 break;
             }
-            f += f < tgt ? CH_FADE_STEP : -CH_FADE_STEP;
+            /* toward the target and no further: (f < tgt ? +step : -step) bounced 32768 <-> 31579 every sub-block once faded in,
+             * a 16-sample square on the dry / wet gains (sidebands at odd multiples of FS / 16 around every note, ~-35 dB) */
+            f += f < tgt ? CH_FADE_STEP : f > tgt ? -CH_FADE_STEP : 0;
             c->fade = f < 0 ? 0 : f > 32768 ? 32768 : f;
             c->ddm = 4096 - (int32_t)(((4096 - CH_DRY) * c->fade) >> 15);   /* the gains at this sub-block's end: fade 0 the input as it is, 1 the chorus */
             c->dwm = (int32_t)((CH_WET * c->fade) >> 15);

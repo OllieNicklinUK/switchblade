@@ -99,7 +99,6 @@ static void fm1_fault(const fm1_crash_t *c)
 static void felucca_init(void)
 {
     uint32_t i;
-    chain_defaults(&chain_config);
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
@@ -189,6 +188,7 @@ static void fm1_main(void)
         settings_save();
     }
     autosave_boot(boot_clean);                /* (1.2) the last session's music, under the splash */
+    scene_boot();                             /* GLOBAL's scenes into their RAM mirror (scene.c) */
     for (ms = 0; ms < 2400u; ms += 10u) {     /* the splash (Switch Blade: 2.4 s); the pot followed (MIDI IN plays under it) */
         fm1_wdt_feed();                       /* (the ~8 s WDT: the boot before the main loop is not fed elsewhere) */
         fm1_delay_ms(10);

@@ -522,6 +522,8 @@ stay where they were. No trailing byte means no SONG command: hide its controls.
 | --- | --- | --- |
 | 33 SONG | op 0 query; op 1 set, count 0..16, count × (slot 0..3, repeat 1..16); op 2 start; op 3 stop | op, rc, count, running 0/1, row 0..15, remaining repeats, count × (slot, repeat) |
 
+**Retired 2026-11-20 (Switch Blade V2: SONG left GLOBAL, the scenes replace it).** Command 33 still answers with the same reply shape: every set (ops 1, 5) and start (ops 2, 6) is refused with rc 1 and changes nothing, every reply has count 0, running 0, row 0, remaining 0; op 3 / 7 still stops the transport. INFO keeps `57 01 4`.
+
 A set must have exactly `2 + count × 2` argument bytes. rc 0 = accepted,
 1 = invalid rows (or an empty chain on start), 2 = busy, 3..6 = source slot 0..3
 is empty. Rejected sets keep every previous row. Set edits RAM; PROJECT save

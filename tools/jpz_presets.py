@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""JP-Z's factory presets from Alan Marcero's JP-8000 / JP-8080 bank (jp80x0_rev_2, 128 patches), with his permission
-(2026-11-19: CREDITS.md). 50 of them, the user's choice: those whose oscillators JP-Z plays (OSC1 SUPER SAW or SAW, OSC2
-SAW / PULSE / TRI, no sync, ring or cross modulation).
+"""JP-Z's 50 factory presets (2026-11-20, the user's choice): 21 of Roland's own JP-8000 factory patches, read from the
+JP-8000 v1.05 firmware ROM, and 29 of Alan Marcero's JP-8000 / JP-8080 bank (jp80x0_rev_2, his permission 2026-11-19:
+CREDITS.md). All are ones whose oscillators JP-Z plays (OSC1 SUPER SAW or SAW, OSC2 SAW / PULSE / TRI, no sync or ring).
+Names: at most 10 characters (the home screen's large type).
 
-  tools/jpz_alan_presets.py [BANK.syx]     (default presets/jp/alan_marcero_jp80x0_rev_2.syx)
+  tools/jpz_presets.py [ROM.bin [BANK.syx]]
+      ROM   default ../ROMS/jp8000_v1.05.bin (beside the repo; not in it: Roland's firmware)
+      BANK  default presets/jp/alan_marcero_jp80x0_rev_2.syx
 
 Writes presets/four/jpz.py (generated: tools/four_presets.py turns it into JPZ_PRESETS / JPZ_PX) and docs/jpz_presets.md,
-what each keeps and loses. The patch layout: gearmulator's jeLib/jemiditypes.h (enum Patch), one DT1 message a patch
-(address 02 0p pp 00, 240 bytes: 0x00..0x7F, then 0x100..0x16F).
+what each keeps and loses.
+
+Alan's bank: one DT1 message a patch (address 02 0p pp 00, 240 bytes: 0x00..0x7F, then 0x100..0x16F), the layout of
+gearmulator's jeLib/jemiditypes.h (enum Patch).
+The ROM: 128 single patches from 0x562B6, 160 bytes each; then the 69 performances from 0x5B2B6, 0x180 bytes each (a
+64-byte header, the Upper patch at +0x40, the Lower at +0xE0). A ROM patch's bytes 0x00..0x49 (name, LFO .. OSC SHIFT) are
+the SysEx layout's own (the enumerated parameters' ranges match it exactly); 0x4A.. are the firmware's internal format (its
+velocity and CONTROL assignments), not read: a ROM patch converts with VELOCITY off.
 
 The mapping (eng_jpz.c):
   OSC1        SUPER SAW: DTN = CTRL1 (the detune, JP-Z's JPZ_DTN is the JP's knob curve), MIX = CTRL2 (the side saws);
@@ -34,25 +43,35 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT_PY = ROOT / "presets" / "four" / "jpz.py"
 OUT_MD = ROOT / "docs" / "jpz_presets.md"
-DEF_SRC = ROOT / "presets" / "jp" / "alan_marcero_jp80x0_rev_2.syx"
+DEF_ROM = ROOT.parent / "ROMS" / "jp8000_v1.05.bin"
+DEF_SYX = ROOT / "presets" / "jp" / "alan_marcero_jp80x0_rev_2.syx"
 
-# the user's 50 (2026-11-19): bank slot (1..128) -> (WAVE category, FM-1 name); listed LEAD, ATMOS, KEYS, BASS
+ROM_SINGLES, ROM_PERFS, ROM_PATCH, ROM_PERF = 0x562B6, 0x5B2B6, 160, 0x180
+
+# the 50 (2026-11-20), listed LEAD, ATMOS, KEYS, BASS: (source, slot, WAVE category, FM-1 name of at most 10)
+#   source "A": Alan's bank, slot 1..128; "R": the ROM, "S<n>" its single patch n (1..128) or "P<n>U" / "P<n>L" a part of
+#   performance n (1..69)
 PICK = [
-    (34, "LEAD", "CLASSIC TRNC"), (73, "LEAD", "SAW LEGAND 1"), (78, "LEAD", "SAW LEGAND 6"), (90, "LEAD", "TRANCY ARP"),
-    (24, "LEAD", "1999 TRANCE"), (25, "LEAD", "70S SUPERSAW"), (31, "LEAD", "BPF SAW"), (37, "LEAD", "DOUBLE TREE"),
-    (43, "LEAD", "FUNNY FACE"), (44, "LEAD", "GAS BRASS"), (52, "LEAD", "JP8 BRASS"), (54, "LEAD", "JUST 2 OSCS"),
-    (59, "LEAD", "MORPHING FX"), (60, "LEAD", "NO SPR REQD"), (62, "LEAD", "PHRYGIAN"), (67, "LEAD", "PUNCHY 7TH"),
-    (72, "LEAD", "RESY BETSY"), (75, "LEAD", "SAW LEGAND 3"), (77, "LEAD", "SAW LEGAND 5"), (79, "LEAD", "SAW LEGAND 7"),
-    (80, "LEAD", "SAW LEGAND 8"), (94, "LEAD", "WHATS THAT"),
-    (97, "ATMOS", "BANDED STRNG"), (103, "ATMOS", "HUMAN"), (114, "ATMOS", "SAW BUTTER"), (116, "ATMOS", "SUPER8 TAB"),
-    (120, "ATMOS", "WHY HAVE JP"), (96, "ATMOS", "ABNER"), (98, "ATMOS", "CALMING SAWS"), (100, "ATMOS", "DIGITAL WRLD"),
-    (104, "ATMOS", "INTO THE SUN"), (107, "ATMOS", "LPF SUPERSAW"), (108, "ATMOS", "NO SUPERSAW"), (111, "ATMOS", "PHASED"),
-    (112, "ATMOS", "POLY STRINGS"), (113, "ATMOS", "RESSY ROLAND"), (115, "ATMOS", "SIMPLICITY"),
-    (118, "ATMOS", "WARM BLANKET"), (119, "ATMOS", "WHISP"),
-    (128, "KEYS", "VAN DYK LIKE"), (123, "KEYS", "DETUNED"), (125, "KEYS", "RUSH"),
-    (18, "BASS", "STACKED"), (9, "BASS", "JUPITER RES"), (11, "BASS", "MASSIV FAT"), (12, "BASS", "MOOGTASTIC"),
-    (19, "BASS", "SUB PUNCHER"), (20, "BASS", "SUPER BASS"), (22, "BASS", "TYAS BASS"), (63, "BASS", "PORTA SPRSAW"),
+    ("A", 34, "LEAD", "CLASSIC"), ("A", 73, "LEAD", "SAW LEGND1"), ("A", 78, "LEAD", "SAW LEGND6"),
+    ("A", 80, "LEAD", "SAW LEGND8"), ("A", 90, "LEAD", "TRANCY ARP"), ("A", 24, "LEAD", "TRANCE 99"),
+    ("A", 25, "LEAD", "70S SPRSAW"), ("A", 31, "LEAD", "BPF SAW"), ("A", 37, "LEAD", "DOUBLETREE"),
+    ("A", 43, "LEAD", "FUNNY FACE"), ("A", 44, "LEAD", "GAS BRASS"), ("A", 52, "LEAD", "JP8 BRASS"),
+    ("A", 54, "LEAD", "JUST 2 OSC"), ("A", 60, "LEAD", "NO SPR REQ"), ("A", 62, "LEAD", "PHRYGIAN"),
+    ("A", 67, "LEAD", "PUNCHY 7TH"), ("A", 72, "LEAD", "RESY BETSY"), ("A", 94, "LEAD", "WHATS THAT"),
+    ("R", "S073", "ATMOS", "STR MACHIN"), ("R", "S074", "ATMOS", "TRON VLNS"), ("R", "S075", "ATMOS", "LUX SYMPH"),
+    ("R", "S076", "ATMOS", "DEBUSSY"), ("R", "S077", "ATMOS", "BPF STRING"), ("R", "S078", "ATMOS", "DETUNE STR"),
+    ("R", "S079", "ATMOS", "JUNO B81"), ("R", "S080", "ATMOS", "RICHLAND"), ("R", "P28L", "ATMOS", "EMPEROR"),
+    ("A", 104, "ATMOS", "INTO SUN"), ("A", 118, "ATMOS", "BLANKET"), ("A", 111, "ATMOS", "PHASED"),
+    ("A", 119, "ATMOS", "WHISP"),
+    ("R", "S028", "KEYS", "SEP WAYS"), ("R", "S029", "KEYS", "FOR RPS"), ("R", "S030", "KEYS", "BREAD+BUTR"),
+    ("R", "S031", "KEYS", "SILK 5THS"), ("R", "P01U", "KEYS", "CHARIOTS"), ("R", "P12U", "KEYS", "1979"),
+    ("R", "S096", "KEYS", "REPLICANT"), ("A", 128, "KEYS", "VAN DYK"), ("A", 123, "KEYS", "DETUNED"),
+    ("A", 125, "KEYS", "RUSH"),
+    ("R", "S006", "BASS", "BIG+DARK"), ("R", "S007", "BASS", "BASS FLOW"), ("R", "S008", "BASS", "JUNO BASS"),
+    ("R", "S010", "BASS", "JUICE BASS"), ("R", "S011", "BASS", "DREAMS"), ("A", 12, "BASS", "MOOGTASTIC"),
+    ("A", 19, "BASS", "SUB PUNCH"), ("A", 22, "BASS", "TYAS BASS"), ("A", 63, "BASS", "PORTA SAW"),
 ]
+NAME_MAX = 10
 REV = dict(LEAD=26, ATMOS=60, KEYS=30, BASS=8)        # the reverb send by category (the JP has no reverb)
 PAT = dict(LEAD=4, ATMOS=5, KEYS=3, BASS=2)
 OSC1 = ["SUPER SAW", "TRI MOD", "NOISE", "FEEDBACK", "SQUARE", "SAW", "TRI"]
@@ -68,7 +87,7 @@ def clampi(v, lo, hi):
     return int(max(lo, min(hi, round(v))))
 
 
-def patches(path):
+def alan_patches(path):
     b = Path(path).read_bytes()
     out, i = [], 0
     while (s := b.find(b"\xf0", i)) >= 0:
@@ -78,8 +97,22 @@ def patches(path):
             out.append(m[10:-2])
         i = e + 1
     if len(out) != 128:
-        raise SystemExit(f"jpz_alan_presets: {len(out)} patches in {path}, want 128")
+        raise SystemExit(f"jpz_presets: {len(out)} patches in {path}, want 128")
     return out
+
+
+def rom_patch(rom, tag):
+    """a ROM patch as a 240-byte SysEx-layout patch (0x00..0x49 its own, the rest 0: VELOCITY off)"""
+    if tag[0] == "S":
+        n = int(tag[1:])
+        o = ROM_SINGLES + (n - 1) * ROM_PATCH
+    else:
+        n = int(tag[1:-1])
+        o = ROM_PERFS + (n - 1) * ROM_PERF + (0x40 if tag[-1] == "U" else 0xE0)
+    p = rom[o:o + ROM_PATCH]
+    if len(p) != ROM_PATCH or not all(32 <= c < 127 for c in p[:16]):
+        raise SystemExit(f"jpz_presets: no patch at ROM {tag} (0x{o:X}): is it the JP-8000 v1.05 ROM?")
+    return bytes(p[:0x4A]) + bytes(240 - 0x4A)
 
 
 def convert(d, cat, name):
@@ -167,35 +200,46 @@ def convert(d, cat, name):
 
 
 def main():
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEF_SRC
-    P = patches(src)
-    out, rep = [], []
-    for slot, cat, name in PICK:
-        d = P[slot - 1]
+    rom_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEF_ROM
+    syx_path = Path(sys.argv[2]) if len(sys.argv) > 2 else DEF_SYX
+    if not rom_path.exists():
+        raise SystemExit(f"jpz_presets: no ROM at {rom_path} (the JP-8000 v1.05 firmware, 524,288 bytes)")
+    rom = rom_path.read_bytes()
+    A = alan_patches(syx_path)
+    out, rep, names = [], [], set()
+    for src, slot, cat, name in PICK:
+        if len(name) > NAME_MAX or name in names:
+            raise SystemExit(f"jpz_presets: {name!r}: names must be unique, at most {NAME_MAX} characters")
+        names.add(name)
+        if src == "A":
+            d, who = A[slot - 1], f"Alan {slot}"
+        else:
+            d, who = rom_patch(rom, slot), f"Roland {slot}"
         p, lost, notes = convert(d, cat, name)
         p["pat"] = PAT[cat]
         out.append(p)
-        rep.append((slot, d[:16].decode("ascii", "replace").strip(), p, lost, notes))
-    L = ["# JP-Z: 50 factory presets from Alan Marcero's JP-8000 / JP-8080 bank (jp80x0_rev_2), with his permission",
-         "# (2026-11-19, CREDITS.md). GENERATED by tools/jpz_alan_presets.py from presets/jp/alan_marcero_jp80x0_rev_2.syx: do",
-         "# not edit by hand; change the converter and run it again. docs/jpz_presets.md: what each keeps and loses.",
+        rep.append((who, d[:16].decode("ascii", "replace").strip(), p, lost, notes))
+    L = ["# JP-Z: 50 factory presets, 21 of Roland's JP-8000 factory patches (the v1.05 firmware ROM) and 29 of Alan Marcero's",
+         "# JP-8000 / JP-8080 bank (jp80x0_rev_2, his permission 2026-11-19, CREDITS.md). GENERATED by tools/jpz_presets.py: do not",
+         "# edit by hand; change the converter and run it again. docs/jpz_presets.md: what each keeps and loses.",
          "# e = [DTN, MIX, BAL, OSC2, CUT, RES, KTR, WID]; px = JPZ_PX (eng_jpz.c jpz_track_loaded): ftype, fe = FLT ENV",
          "# {LVL A D S R}, penv {depth+64 (0 off), A, D, dest (< 64 OSC2)}, osc2 {wave 0 SAW 1 PULSE 2 TRI, PW}, fine (cents+64,",
          "# 0 none), shift (octaves+3, 0 none), lvl (AMP LEVEL, 0 = 127), lfo {set, RATE, WAVE, TRIG, FADE}, ld = LFO DEST PIT FLT",
-         "# AMP, glide, mx = the matrix (SRC DST AMT x 4). The bank this replaces (the 2026-11-18 first voicing) is in git.",
+         "# AMP, glide, mx = the matrix (SRC DST AMT x 4). The banks this replaces are in git.",
          "", "PRESETS = ["]
     L += ["    " + repr(p) + "," for p in out]
     L.append("]")
     OUT_PY.write_text("\n".join(L) + "\n", newline="\n")
-    M = ["# JP-Z presets: Alan Marcero's JP-8000 bank on JP-Z", "",
-         "Generated by `tools/jpz_alan_presets.py` from Alan Marcero's `jp80x0_rev_2` bank (128 patches; used with his",
-         "permission, 2026-11-19). The 50 are the ones whose oscillators JP-Z plays. Per preset: what the conversion",
-         "approximates (notes) and what it could not carry (lost).", "",
-         "| # | JP-Z | Alan's patch (bank slot) | Category | Notes | Lost |", "|---|---|---|---|---|---|"]
-    for k, (slot, an, p, lost, notes) in enumerate(rep):
-        M.append(f"| {k + 1} | {p['name']} | {an} ({slot}) | {p['cat']} | {'; '.join(notes) or '-'} | {'; '.join(x for x in lost if x) or '-'} |")
+    M = ["# JP-Z presets: Roland's JP-8000 factory patches and Alan Marcero's bank on JP-Z", "",
+         "Generated by `tools/jpz_presets.py`: 21 of Roland's JP-8000 factory patches (read from the v1.05 firmware ROM; S = a",
+         "single patch, P = a performance's Upper / Lower part; converted with VELOCITY off) and 29 of Alan Marcero's",
+         "`jp80x0_rev_2` bank (used with his permission, 2026-11-19). All are ones whose oscillators JP-Z plays. Per preset:",
+         "what the conversion approximates (notes) and what it could not carry (lost).", "",
+         "| # | JP-Z | Source patch | Category | Notes | Lost |", "|---|---|---|---|---|---|"]
+    for k, (who, an, p, lost, notes) in enumerate(rep):
+        M.append(f"| {k + 1} | {p['name']} | {an} ({who}) | {p['cat']} | {'; '.join(notes) or '-'} | {'; '.join(x for x in lost if x) or '-'} |")
     OUT_MD.write_text("\n".join(M) + "\n", newline="\n")
-    print(f"jpz_alan_presets: {len(out)} presets -> {OUT_PY.relative_to(ROOT)}, report {OUT_MD.relative_to(ROOT)}")
+    print(f"jpz_presets: {len(out)} presets -> {OUT_PY.relative_to(ROOT)}, report {OUT_MD.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
