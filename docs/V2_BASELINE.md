@@ -129,3 +129,9 @@ Anything else stays RAM-only, as before. `tests/flash_id_test.c` covers both par
 - WAVE: +4 dB after the clipper (`VOID_POST`: the clipper and filter unchanged); the four stabs swapped for V2's ACID TECHNO, SUB SAW LAYR, SUB STAB TEK, REESE WOBBLE (KEYS 10, BASS 18). VOWEL's corner DC bound 2 -> 2.5 % (the corner now reaches the master's limiter).
 - Tests: `jpz_test.c` and `cz_test.c` pin their scenarios to the first voicing's TRANCE LEAD / CZ BASS / CZ BRASS (the banks changed under them); the WAVE scenario hashes re-recorded. Goldens, union, CPU and budget: only these four machines' entries (plus the two four-machine mixes and the switch sequences). All host tests pass.
 - Levels (preset audit, dBFS median): WAVE -13.4 (was -18.4), JUNO -12.7, JP-Z -12.0, CZ-Z -15.6. Image 473,400 B; RAM unchanged.
+
+## JP-Z bank: Roland factory + Alan Marcero (2026-11-20)
+
+- JP-Z's 50: 21 of Roland's JP-8000 factory patches, the user's choice (singles S006 S007 S008 S010 S011 S028..S031 S073..S080 S096, performance parts P01U P12U P28L), read from the JP-8000 v1.05 firmware ROM (`../ROMS/jp8000_v1.05.bin`, not in the repo: single patches at 0x562B6, 160 bytes; performances at 0x5B2B6, 0x180 bytes, Upper +0x40, Lower +0xE0; bytes 0x00..0x49 are the SysEx patch layout, the rest internal: converted with VELOCITY off), and 29 of Alan Marcero's (18 leads, 4 atmos, 3 keys, 4 bass). `tools/jpz_presets.py` replaces `tools/jpz_alan_presets.py` (the same conversion). Categories LEAD 18, ATMOS 13, KEYS 10, BASS 9.
+- Every JP-Z name is at most 10 characters (the home screen's large type); the other machines' names are unchanged (12).
+- Goldens and the CPU baseline: only the JP-Z preset entries re-recorded. Roland's factory data: settle the licensing before the repo goes public (as CZ-Z).

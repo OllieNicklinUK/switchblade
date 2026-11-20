@@ -24,7 +24,7 @@
  * (7 saws each). The phases live in the part's engine memory, seeded once each time JP-Z claims it (a zeroed region would
  * start all seven in phase: the spec's revision note 2).
  *
- * 2026-11-19, for Alan Marcero's JP-8000 bank (tools/jpz_alan_presets.py; his permission, CREDITS.md): the JP's patch
+ * 2026-11-19, for Alan Marcero's JP-8000 bank (tools/jpz_presets.py; his permission, CREDITS.md): the JP's patch
  * parts JP-Z had not, in the track's retired DIGITAL operator ids (a preset load resets them: 0 / their defaults = off):
  *   OSC2's waveform P_FM4_ATK (0 SAW, 1 PULSE, 2 TRI; the JP's naive ones, as its saws) and the pulse's width P_FM4_DEC
  *        (the JP's OSC2 CTRL1: 0 = 50 %, 127 = 15 %, unverified: by ear); OSC2 FINE P_FM3_REL (0 none, else - 64 cents);

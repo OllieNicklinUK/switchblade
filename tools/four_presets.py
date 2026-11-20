@@ -28,7 +28,7 @@ CATS = {                                                         # per machine: 
     "ACID": {"ACID": 2, "BASS": 12, "LEAD": 5, "KEYS": 7, "ATMOS": 6},      # NANO (2026-10-21): the 303's 2, then the SUB model's 30 (fm1_subsynth_presets.h)
     "DRIFT": {"BASS": 12, "LEAD": 18, "KEYS": 20},                     # 2026-11-19: 32 seeds + 18 from the Ultramaster KR-106's factory banks
     # the V2 machines (2026-11-17-eight-machines.md, section 8): all 50 count
-    "JPZ": {"LEAD": 22, "ATMOS": 17, "KEYS": 3, "BASS": 8},             # 2026-11-19: Alan Marcero's JP-8000 bank (tools/jpz_alan_presets.py)
+    "JPZ": {"LEAD": 18, "ATMOS": 13, "KEYS": 10, "BASS": 9},            # 2026-11-20: 21 Roland JP-8000 factory + 29 Alan Marcero (tools/jpz_presets.py)
     "CZZ": {"KEYS": 22, "LEAD": 13, "ATMOS": 11, "BASS": 4},             # 2026-11-19: the Casio CZ-230S's tones (tools/czz_cz230s_presets.py)
     "GWZ": {"KEYS": 22, "ATMOS": 12, "LEAD": 10, "BASS": 6},
     "MICRO": {"ATMOS": 18, "KEYS": 12, "LEAD": 10, "BASS": 10},
@@ -63,7 +63,7 @@ def cz_px(p):
     return list(d["r"]) + list(d["l"]) + [8 if sus is None else sus, d["end"], iv]
 
 
-# JP-Z (eng_jpz.c jpz_track_loaded): the JP extras of Alan Marcero's patches (presets/four/jpz.py px; absent = all off)
+# JP-Z (eng_jpz.c jpz_track_loaded): the JP extras of its patches (Roland factory, Alan Marcero) (presets/four/jpz.py px; absent = all off)
 JPZ_KEYS = ["ftype", "fe", "penv", "osc2", "fine", "shift", "lvl", "lfo", "ld", "glide", "mx"]
 JPZ_LEN = dict(fe=5, penv=4, osc2=2, lfo=5, ld=3, mx=12)
 JPZ_DEF = dict(ftype=0, fe=[0, 0, 64, 127, 64], penv=[0, 0, 0, 127], osc2=[0, 0], fine=0, shift=0, lvl=0, lfo=[0, 0, 0, 0, 0],
