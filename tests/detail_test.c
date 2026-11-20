@@ -187,19 +187,6 @@ static int knobs(void)
     kt(EN_K4, -2);
     ok &= msg_is("ACC PLAYS 127") && t->step[2].vel == 94u;
     bad += check("  NUDGE with QUANTIZE ON: QUANTIZE IS ON (kept); VEL on an ACC step: ACC PLAYS 127 (kept)", ok);
-
-    pattern(0);
-    go_detail();
-    t = &trk[0];
-    memcpy(ref, t->step, sizeof ref);
-    chain.running = 1;
-    ui.msg_t = 0;
-    kt(EN_K2, 1);
-    turn(EN_PRESET, 1);
-    press(B_EDIT);
-    ok = msg_is("STOP TO EDIT") && !memcmp(t->step, ref, sizeof ref) && ui.cursor == 0u;
-    chain.running = 0;
-    bad += check("  while a song plays: STOP TO EDIT, nothing changes", ok);
     return bad;
 }
 

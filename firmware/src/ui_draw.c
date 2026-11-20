@@ -286,19 +286,14 @@ static void head_msg(int32_t x, int32_t maxw)
         cv_icon_mid(x + 6, H_HEAD / 2, 16, ICON_X_LOCK, T_THEME, T_BG);
 }
 /* the slot letter after the track's cushion (1.2): the PROJECT slot of the pattern the selected track plays or edits.
- * A song playing: its section's slot for the track ("-" silent there); else the slot the working pattern came from
+ * The slot the working pattern came from
  * (ui.c pat_from: the last PROJECT load or save), with a mark ("A*") once it was edited since (its steps, LEN DIV SWING
  * GATE, QUANTIZE or automation: ui.c pat_from_sig); none at power-on, after a PHRASES pattern or the editor's restore.
  * b: the letter (b[1] '*' or 0); 0 = none */
 static int head_slot(char *b)
 {
-    uint32_t k = song.sel % NTRK, s;
+    uint32_t k = song.sel % NTRK;
     b[1] = b[2] = 0;
-    if (chain.running) {
-        s = chain.lane[k];
-        b[0] = s < 4u ? (char)('A' + s) : '-';
-        return 1;
-    }
     if (!pat_from[k] || pat_from[k] > 4u)
         return 0;
     b[0] = (char)('A' + pat_from[k] - 1u);
@@ -306,22 +301,16 @@ static int head_slot(char *b)
         b[1] = '*';
     return 1;
 }
-/* the octave, or the song row while a song plays, its right end at HEAD_GRP_R */
+/* the octave, its right end at HEAD_GRP_R */
 static void head_group(void)
 {
     char b[8];
     int32_t x;
-    if (chain.running) {
-        fmt_int(b, (int32_t)chain.row + 1);
-        x = HEAD_GRP_R - (16 + 4 + text_w(&AF_M, b));
-        x += cv_icon_mid(x, H_HEAD / 2, 16, ICON_X_SONG, T_MID, T_BG);   /* SONG: the disc */
-    } else {
-        str_cpy(b, song.octave > 0 ? "+" : "", sizeof b);
-        fmt_int(b + str_len(b), song.octave);
-        x = HEAD_GRP_R - (text_w(&AF_S, "OCT") + 4 + text_w(&AF_M, b));
-        GFX_HOOK_ALIGN(0, 0, 0, H_HEAD, AL_V, "header text on its middle");
-        x = cv_text(x, HEAD_SY, &AF_S, "OCT", T_MID);
-    }
+    str_cpy(b, song.octave > 0 ? "+" : "", sizeof b);
+    fmt_int(b + str_len(b), song.octave);
+    x = HEAD_GRP_R - (text_w(&AF_S, "OCT") + 4 + text_w(&AF_M, b));
+    GFX_HOOK_ALIGN(0, 0, 0, H_HEAD, AL_V, "header text on its middle");
+    x = cv_text(x, HEAD_SY, &AF_S, "OCT", T_MID);
     GFX_HOOK_ALIGN(0, 0, 0, H_HEAD, AL_V, "header text on its middle");
     cv_text(x + 4, HEAD_MY, &AF_M, b, T_THEME);
 }
@@ -340,7 +329,7 @@ static void draw_head(void)
     uint32_t sig = (uint32_t)song.playing * 3u + rec * 5u + (uint32_t)(song.octave + 8) * 11u + song.sel * 13131u +
                    (ui.msg_t ? str_hash(7u, ui.msg) : ui.layer * 7919u + (uint32_t)layer_locked() * 3u) + (uint32_t)song.g[G_BPM] * 101u + (ui.bpm_t != 0) * 31u +
                    (uint32_t)seq_counting() * 7u + (ui_prefs & PREF_BPM_LOCK) * 4099u +
-                   (uint32_t)batt_shown() * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) +
+                   (uint32_t)batt_shown() * 7777u +
                    (slot ? str_hash(11u, sl) : 0u) + (uint32_t)midi_lit(song.sel) * 15485863u;   /* (1.5.5) */
     if (!ui.msg_t && !ui.layer && !ui.bpm_t && big_page()) {   /* EDIT: the machine and the sound */
         char pn[16];
@@ -387,7 +376,7 @@ static void draw_head(void)
         head_big(song.rec ? rx + 18 : rx + 4, HEAD_GRP_R);
     } else if (centre) {
         int32_t ib[4], lx = g.bx + g.b[2];             /* lx: the right end of the BPM (and its lock) */
-        uint32_t id = song.playing ? (chain.running ? ICON_X_SONG : ICON_X_PLAY) : seq_counting() ? ICON_X_PLAY : ICON_X_STOP;
+        uint32_t id = song.playing ? ICON_X_PLAY : seq_counting() ? ICON_X_PLAY : ICON_X_STOP;
         icon_ink(16, id, ib);                          /* the play state: the song's disc, play (counting in: the
                                                         * accent's, about to play), stop */
         cv_icon_mid(g.px1 - ib[2], H_HEAD / 2, 16, id, /* (right-aligned in its slot) */
@@ -408,7 +397,7 @@ static void draw_head(void)
     } else {
         head_msg(-1, HEAD_MSG_W);
     }
-    if (!msg && !big && (chain.running || song.octave))
+    if (!msg && !big && song.octave)
         head_group();
     if (!(msg && centre))
         draw_battery(HEAD_BAT_X);
@@ -895,24 +884,6 @@ static void draw_columns(void)
         draw_edit_big();
         return;
     }
-    if (cur_page()->graph == GR_SONG) {             /* SECTION, TRACK, its PAT (A..D, -), REPS (the section's) */
-        uint32_t row = ui.song_row < CHAIN_ROWS ? ui.song_row : CHAIN_ROWS - 1u, k = ui.song_trk % NTRK, sl;
-        int used = row < chain_config.count;
-        fmt_int(val, (int32_t)row + 1);
-        draw_column(0, "SEC", val, "", VAL(0u), -1, ICON_X_SONG);
-        val[0] = 'T';
-        val[1] = (char)('1' + k);
-        val[2] = 0;
-        draw_column(1, "TRACK", val, "", VAL(1u), -1, trk_icon(k, 1));
-        sl = used ? chain_config.row[row].slot[k] : CHAIN_SILENT;
-        if (used) { val[0] = sl < 4u ? (char)('A' + sl) : '-'; val[1] = 0; }
-        else str_cpy(val, "--", sizeof val);
-        draw_column(2, "PAT", val, "", used ? VAL(2u) : T_DIM, -1, ICON_X_PATTERN);
-        if (used) fmt_int(val, chain_config.row[row].repeat);
-        else str_cpy(val, "--", sizeof val);
-        draw_column(3, "REPS", val, "", used ? VAL(3u) : T_DIM, -1, ICON_AUTO);
-        return;
-    }
     if (cur_page()->graph == GR_EVENTS) {              /* AUTOMATION (ui_events.c): ROW STEP PARAM VALUE */
         const track_t *t = TSEL;
         uint16_t rw[EV_ROWS];
@@ -1313,14 +1284,7 @@ static void confirm_text(char *a, char *b)
     case CF_OVR_PROJ:
         str_cpy(a, "OVERWRITE PROJECT A?", 24);
         a[18] = (char)('A' + (k & 3u));
-        if (!project_name(k & 3u, b) || !b[0])          /* the project's name, else what SONG plays from it */
-            str_cpy(b, "SONG PATTERN CHANGES", 24);
-        break;
-    case CF_DEL_ROW:
-        str_cpy(a, "DELETE SECTION?", 24);
-        break;
-    case CF_CLEAR_SONG:
-        str_cpy(a, "CLEAR SONG ORDER?", 24);
+        project_name(k & 3u, b);                        /* the project's name ("" none) */
         break;
     case CF_INIT_SOUND:
         str_cpy(a, "INITIALIZE SOUND?", 24);

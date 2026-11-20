@@ -114,12 +114,7 @@ static int loads_and_song(void)
     undo_swap(); bad += check("sound undo restores the original motion pool and base", motion_count(t) == 2u && t->p[P_REV] == 21 &&
                               t->eng_req == e0);
     undo_swap(); bad += check("sound redo restores the loaded motion state", motion_count(t) == 1u && t->eng_req == e1);
-    undo_swap(); project_save(0);
-    t->p[P_REV] = 43; t->step[0].note[0] = 72; chain_config.count = 1; chain_config.row[0] = chain_row_of(0, 1);
-    bad += check("song preparation imports saved motion alongside steps", chain_prepare() == 0 && chain.source[0].motion.count == 2u);
-    seq_start(); seq_tick(t, CTL);
-    bad += check("song plays saved automation with current instruments", chain.running && t->p[P_REV] == 100 && t->step[0].note[0] == 72);
-    seq_stop(); bad += check("song stop restores current base and editable pattern", t->p[P_REV] == 43 && t->step[0].note[0] == 72);
+    undo_swap();                                   /* (SONG's checks, its slots' motion: retired with SONG, 2026-11-20) */
     return bad;
 }
 static int repeat_mode(void)
@@ -488,16 +483,7 @@ static int lock_project(void)
     project_load(2);
     bad += check("  saved and loaded: the locks play again", motion_lock_count(t) == 2u && lock_passes(t,
         (const int16_t[8]){20, 33, 101, 33, 33, 33, 33, 33}));
-    seq_stop();
-    chain_config.count = 1; chain_config.row[0] = chain_row_of(2, 1);
-    motion_clear(t); t->p[P_REV] = 20;
-    bad += check("SONG: a slot's locks come with its motion", chain_prepare() == 0 && chain.source[2].motion.count == 3u);
-    seq_start(); seq_tick(t, CTL);
-    lock_next(t); lock_next(t);
-    ok = chain.running && t->seq_idx == 2u && t->p[P_REV] == 101;
-    lock_next(t);
-    bad += check("  a song plays them on their step, back after it", ok && t->p[P_REV] == 33);
-    seq_stop(); chain_config.count = 0; chain.armed = 0;
+    seq_stop();                                    /* (SONG's: a slot's locks in a song: retired with SONG, 2026-11-20) */
     return bad;
 }
 /* the UI: hold a step, turn a knob (ui_input.c lock_*) */
@@ -537,10 +523,7 @@ static int lock_ui(void)
     cursor_set(0);
     press(B_EDIT);
     bad += check("  [EDIT] alone clears the step and its locks", !t->step[0].n && !motion_lock_count(t));
-    song.playing = 1; chain.running = 1;
-    lk_down(kn); turn(EN_K3, 1); lk_up(kn);
-    bad += check("  a song playing: STOP TO EDIT, no lock", !motion_lock_count(t));
-    song.playing = 0; chain.running = 0; song.rec = 0;
+    song.rec = 0;
     return bad;
 }
 /* 1.1.5: lock edits by hand are one undo (SAVE held), redo too */
@@ -669,10 +652,6 @@ static int auto_list(void)
     ok = motion.event[0].value == v + 6;
     hold(B_SAVE);
     bad += check("  KNOB 4 turned on (three turns): one undo", ok && motion.event[0].value == v);
-    chain.running = 1;
-    turn(EN_K4, 1);
-    bad += check("  a song playing: STOP TO EDIT", motion.event[0].value == v && str_eq(ui.msg, "STOP TO EDIT"));
-    chain.running = 0;
     for (i = 0; motion.count < MOTION_MAX; i++)          /* the 128 used (track 2) */
         motion_set_event(&trk[1], i % NSTEP, i < NSTEP ? P_REV : P_DLY, 10);
     turn(EN_K1, 5);

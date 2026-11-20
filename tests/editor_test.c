@@ -62,7 +62,6 @@ static void reset(void)
 {
     uint32_t t, i;
     memset(&song, 0, sizeof song); memset(trk, 0, sizeof trk);
-    memset(&chain, 0, sizeof chain); chain_defaults(&chain_config);
     memset(&ed_w, 0, sizeof ed_w); memset(&ui, 0, sizeof ui);
     memset(&favorites, 0, sizeof favorites); memset(&settings, 0, sizeof settings); settings_init();
     memset(proj_slot, 0, sizeof proj_slot); memset(up_bank, 0, sizeof up_bank);
@@ -389,58 +388,33 @@ static int up_stalled(void)
     return bad;
 }
 
+/* SONG (command 33) retired with the song chain, 2026-11-20: the reply keeps its shape (op, rc, 0 sections, not
+ * running), every set (ops 1, 5) and PLAY (2, 6) is refused (rc 1) and changes nothing, op 3 / 7 still stops; the INFO
+ * tag 57 01 04 stays (an editor reads the reply's 0 sections) */
 static int song_protocol(void)
 {
-    uint8_t a[] = {1, 1, 0, 2};
-    chain_config_t before;
+    static const uint8_t set[] = {5, 2, 0, 1, CHAIN_SILENT, 0, 3, CHAIN_SILENT, CHAIN_SILENT, CHAIN_SILENT, CHAIN_SILENT, 1};
+    static const uint8_t old[] = {1, 1, 0, 2}, q0[] = {0}, q4[] = {4}, play[] = {2}, stop[] = {3}, info[] = {0};
+    uint32_t n, i, tag = 0;
     int bad = 0;
     reset();
-    bad += check("SONG sets and queries the complete chain without changing selection",
-                 request(ED_SONG, a, sizeof a) == 14u && !host_wire[6] && chain_config.count == 1 && song.sel == 0);
-    before = chain_config; a[3] = 0;
-    bad += check("SONG invalid repeats leave the chain unchanged",
-                 request(ED_SONG, a, sizeof a) == 14u && host_wire[6] == 1 && !memcmp(&before, &chain_config, sizeof before));
-    a[3] = 2; chain.armed = 1;
-    bad += check("SONG cannot replace a chain while its start is pending",
-                 request(ED_SONG, a, sizeof a) == 14u && host_wire[6] == 2 && !memcmp(&before, &chain_config, sizeof before));
-    chain.armed = 0; a[0] = 2;
-    bad += check("SONG PLAY refuses extra argument bytes", !request(ED_SONG, a, 2) && !transport_req);
-    {   /* 1.2 (`57 01 04`): sections with a slot per track, ops 4..7; the v6 ops see each section's clock lane */
-        static const uint8_t set[] = {5, 2, 0, 1, CHAIN_SILENT, 0, 3, CHAIN_SILENT, CHAIN_SILENT, CHAIN_SILENT, CHAIN_SILENT, 1};
-        static const uint8_t q4[] = {4}, q0[] = {0}, bad5[] = {5, 1, 0, 0, 5, 0, 1}, old4[] = {1, 1, CHAIN_SILENT, 1};
-        static const uint8_t info[] = {0};
-        uint32_t n, i, tag = 0;
-        reset();
-        n = request(ED_SONG, set, sizeof set);
-        bad += check("SONG op 5 sets sections (T1 A, T2 B, T3 -, T4 A x3; all - x1), the reply in lanes",
-                     n == 5u + 6u + 2u * 5u + 1u && host_wire[5] == 5 && !host_wire[6] && host_wire[7] == 2 &&
-                     !memcmp(host_wire + 11, set + 2, 10) && chain_config.count == 2 &&
-                     !memcmp(&chain_config.row[0], &(chain_row_t){{0, 1, CHAIN_SILENT, 0}, 3}, sizeof(chain_row_t)) &&
-                     chain_config.row[1].slot[0] == CHAIN_SILENT && chain_config.row[1].repeat == 1);
-        n = request(ED_SONG, q4, 1);
-        bad += check("SONG op 4 queries them as set", n == 22u && host_wire[5] == 4 && !memcmp(host_wire + 11, set + 2, 10));
-        n = request(ED_SONG, q0, 1);
-        bad += check("SONG op 0 (v6 editors): a row per section, its clock lane's slot (T1 A; all - : A)",
-                     n == 16u && host_wire[11] == 0 && host_wire[12] == 3 && host_wire[13] == 0 && host_wire[14] == 1);
-        bad += check("SONG op 5: a slot past - (5) refused, the sections kept",
-                     request(ED_SONG, bad5, sizeof bad5) == 22u && host_wire[6] == 1 && chain_config.count == 2);
-        bad += check("SONG op 1 (v6): no - in a row of one slot", request(ED_SONG, old4, sizeof old4) == 16u &&
-                     host_wire[6] == 1 && chain_config.count == 2);
-        chain.armed = 1;
-        bad += check("SONG op 5 waits for a pending start (rc 2)", request(ED_SONG, set, sizeof set) == 22u && host_wire[6] == 2);
-        chain.armed = 0;
-        n = request(ED_INFO, info, 0);
-        for (i = 5; i + 2u < n; i++)
-            if (host_wire[i] == 0x57 && host_wire[i + 1u] == 1 && host_wire[i + 2u] == NTRK) tag = 1;
-        bad += check("INFO says the lanes: 57 01 04", tag);
-        {
-            uint8_t q[4] = {0, P_SQNT, 0, 0};
-            trk[0].p[P_SQNT] = 1; chain.running = 1;
-            request(ED_SET, q, 4);
-            chain.running = 0;
-            bad += check("SET of QUANTIZE waits while a song plays (its slots set it)", trk[0].p[P_SQNT] == 1);
-        }
-    }
+    n = request(ED_SONG, old, sizeof old);
+    bad += check("SONG op 1 (retired): refused (rc 1), 0 sections, not running", n == 12u && host_wire[5] == 1 &&
+                 host_wire[6] == 1 && !host_wire[7] && !host_wire[8] && song.sel == 0);
+    n = request(ED_SONG, set, sizeof set);
+    bad += check("SONG op 5 (retired): refused, the reply of no sections", n == 12u && host_wire[5] == 5 && host_wire[6] == 1);
+    bad += check("SONG ops 0 / 4: no sections", request(ED_SONG, q0, 1) == 12u && !host_wire[6] && !host_wire[7] &&
+                 request(ED_SONG, q4, 1) == 12u && !host_wire[7]);
+    n = request(ED_SONG, play, 1);
+    bad += check("SONG PLAY: refused, nothing starts", n == 12u && host_wire[6] == 1 && !transport_req);
+    transport_req = 0;
+    request(ED_SONG, stop, 1);
+    bad += check("SONG op 3 still stops (transport_req 2)", transport_req == 2);
+    transport_req = 0;
+    n = request(ED_INFO, info, 0);
+    for (i = 5; i + 2u < n; i++)
+        if (host_wire[i] == 0x57 && host_wire[i + 1u] == 1 && host_wire[i + 2u] == NTRK) tag = 1;
+    bad += check("INFO still says 57 01 04", tag);
     return bad;
 }
 

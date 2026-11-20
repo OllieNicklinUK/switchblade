@@ -51,7 +51,6 @@ static void fresh(void)
     uint32_t p;
     memset(trk, 0, sizeof trk);
     memset(&song, 0, sizeof song);
-    memset(&chain, 0, sizeof chain);
     memset(&midi_clock, 0, sizeof midi_clock);
     host_tracks_init();
     for (p = 0; p < NPART; p++) host_preset(&trk[p], 0, 0);

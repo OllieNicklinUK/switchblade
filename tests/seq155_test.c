@@ -179,41 +179,8 @@ static int cond_locks_rolls(void)
     return bad;
 }
 
-/* SONG: each section's pattern counts from its first loop; the section's repeats are its loops */
-static int cond_song(void)
-{
-    int bad = 0, ok;
-    uint8_t nt[256];
-    uint32_t n = 0, i, c1 = 0, c4 = 0;
-    track_t *t = melody(1u | 1u << 4 | 1u << 8);
-    set_cond(&t->step[4], 3);                          /* 1:3 */
-    set_cond(&t->step[8], 9);                          /* 4:4 */
-    t->p[P_SLEN] = 12;
-    for (i = 1; i < NTRK; i++)
-        track_defaults_steps(&trk[i]);
-    project_save(0);
-    chain_config.count = 2;
-    chain_config.row[0] = (chain_row_t){{0, 0, 0, 0}, 4};
-    chain_config.row[1] = (chain_row_t){{0, 0, 0, 0}, 2};
-    ok = chain_prepare() == 0;
-    while (n < 256u && i++ < 40000u && (chain.running || chain.armed)) {
-        uint32_t v0 = vage, k;
-        events_block(CTL);
-        for (; v0 < vage; v0++)
-            for (k = 0; k < NVOICE; k++)
-                if (trk[0].v[k].age == v0 + 1u && n < 256u)
-                    nt[n++] = trk[0].v[k].note;
-    }
-    for (i = 0; i < n; i++) {
-        c1 += nt[i] == 64u;
-        c4 += nt[i] == 68u;
-    }
-    ok &= !chain.running && c1 == 3u && c4 == 1u;     /* 1:3: section 1 loops 1 4, section 2 loop 1; 4:4: section 1's 4th */
-    bad += check("conditions in a SONG: each section from its loop 1 (1:3 x3 over 4 + 2 repeats, 4:4 once)", ok);
-    chain_defaults(&chain_config);
-    memset(proj_slot, 0, sizeof proj_slot);
-    return bad;
-}
+/* (cond_song, CONDITIONS counted from each SONG section's first loop: retired with SONG, 2026-11-20; the scenes' recall
+ * takes its place in the scenes plan's G.2) */
 
 /* NUDGE: step 1 played early (QUANTIZE OFF, -4/16) belongs to the loop it starts */
 static int cond_nudge(void)
@@ -569,7 +536,7 @@ static int test_double_half(void)
 
 int main(void)
 {
-    int bad = conditions() + cond_locks_rolls() + cond_song() + cond_nudge() + cond_ui() + fill_key() + cond_store() + test_euclid() + test_double_half();
+    int bad = conditions() + cond_locks_rolls() + cond_nudge() + cond_ui() + fill_key() + cond_store() + test_euclid() + test_double_half();
     printf("%s\n", bad ? "SEQ 1.5.5 TEST FAILED" : "seq 1.5.5 tests passed");
     return bad != 0;
 }

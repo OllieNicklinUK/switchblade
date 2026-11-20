@@ -81,8 +81,6 @@ static void reset(void)
     memset(nor, 0xFF, sizeof nor);
     memset(&song, 0, sizeof song);
     memset(trk, 0, sizeof trk);
-    memset(&chain, 0, sizeof chain);
-    chain_defaults(&chain_config);
     memset(proj_slot, 0, sizeof proj_slot);
     memset(up_bank, 0, sizeof up_bank);
     memset(&persist_saved, 0, sizeof persist_saved);
@@ -121,7 +119,6 @@ static void as_power_on(void)                            /* RAM lost: the defaul
     memset(&as, 0, sizeof as);
     memset(&ui, 0, sizeof ui);
     proj_name[0] = 0;
-    chain_defaults(&chain_config);
     host_tracks_init();
     for (k = 0; k < NTRK; k++)
         trk[k].eng_req = trk[k].engine = (uint8_t)TRK_DEF[k][0];
@@ -391,10 +388,6 @@ int main(void)
     settings_poll();
     bad += check("pending PLAY: settings still queued, no erase", persist_pending && !erases);
     transport_req = 0;
-    chain.armed = 1;
-    settings_poll();
-    bad += check("pending SONG: settings still queued, no erase", persist_pending && !erases);
-    chain.armed = 0;
     settings.lowcut = 1;
     settings_poll();
     bad += check("STOP: latest settings saved and request cleared", !persist_pending && erases == 1u &&
@@ -535,10 +528,6 @@ int main(void)
                 }
         }
     }
-    chain_config.count = 1;
-    chain_config.row[0] = chain_row_of(3, 1);
-    bad += check("SONG sources use the same step bounds", chain_prepare() == 0 &&
-                  !memcmp(&chain.source[3].step[0][0], &trk[0].step[0], sizeof(step_t)));
     seq_stop();
     transport_req = 0;
     memset(&r, 0, sizeof r);
@@ -580,9 +569,6 @@ int main(void)
     transport_req = 1;
     bad += check("pending PLAY: preset save blocked", up_put(3, &r) == 2 && erases == before && !up_used(3));
     transport_req = 0;
-    chain.armed = 1;
-    bad += check("pending SONG: preset save blocked", up_put(3, &r) == 2 && erases == before && !up_used(3));
-    chain.armed = 0;
     bad += check("preset invalid slot blocked before access", up_put(UP_SLOTS, &r) == 1 && erases == before);
     song.playing = 0; transport_req = 1; irq_start_race = 1;
     bad += check("PLAY consumed before the save snapshot still blocks a project write",

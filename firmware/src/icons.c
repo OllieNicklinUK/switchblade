@@ -232,7 +232,7 @@ static uint32_t page_icon(const page_t *pg)
     switch (pg->graph) {
     case GR_TRK: return ICON_X_MIXER;         /* MIXER (HOME): vertical faders */
     case GR_PATS: return ICON_X_PATTERN;      /* SAVE > PHRASES: the pattern loader */
-    case GR_SONG: return ICON_X_SONG;         /* SONG: the disc */
+    case GR_SCENE: return ICON_X_SONG;        /* GLOBAL (the scenes; SONG's disc until it has its own) */
     case GR_EVENTS: return motion_icon();     /* AUTOMATION */
     default: return ICON_NONE;
     }

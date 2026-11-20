@@ -85,14 +85,6 @@ static uint32_t key_place(uint32_t k)
         n += (uint32_t)(key_black(i) == key_black(k));
     return n;
 }
-/* GLO > SONG (song.grid 3): key k's slot, the white keys A3 B3 C4 D4 (white places 2..5: keys 4 6 7 9 from F) A..D; -1 = a
- * key that plays. A table, not key_place (a loop); the audio ISR's key loop reads SONG_KEYS, the same keys */
-#define SONG_KEYS (1u << 4 | 1u << 6 | 1u << 7 | 1u << 9)
-static int32_t song_key(uint32_t k)
-{
-    static const int8_t S[10] = {-1, -1, -1, -1, 0, -1, 1, 2, -1, 3};
-    return k < 10u ? S[k] : -1;
-}
 
 static uint32_t scale_mask(const track_t *t)
 {
@@ -196,9 +188,15 @@ static void arp_remove(track_t *t, uint32_t note)
 }
 
 #define ND_NONE 0u                      /* track_t nd_late / nd_early: nothing latched (seq_tick; else its seq_pos + 1) */
+/* the steps a track plays (up to 2026-11-20 a SONG's slot copy while one played: song_chain.c, out of the build) */
+static const step_t *seq_steps(const track_t *t) { return t->step; }
+static void seq_release(track_t *t);
+static void seq_stop(void);
+static uint32_t div_samples(uint32_t div);
+static uint32_t step_samples(const track_t *t, uint32_t period, uint32_t idx);
 static void rec_note(track_t *t, uint32_t note, uint32_t vel);
 static void rec_release(track_t *t, uint32_t note);
-static int rec_on(const track_t *t) { return ((song.rec >> trk_index(t)) & 1u) && song.playing && !chain.running; }
+static int rec_on(const track_t *t) { return ((song.rec >> trk_index(t)) & 1u) && song.playing; }
 
 #include "motion.c"
 
@@ -335,9 +333,9 @@ static uint8_t cin_flush;                       /* the count-in ended in this bl
 static uint8_t cin_note[NTRK][4], cin_vel[NTRK][4], cin_n[NTRK], cin_up[NTRK];   /* kept notes; cin_up bit k: let go */
 static int seq_counting(void) { return cin_left != 0u; }
 static uint32_t click_beat_len(void) { return 4u * div_samples(2); }   /* DIV 2: 1/16 */
-static int click_wanted(void)                  /* CLICK REC: while a track is armed (not in a song: no recording) */
+static int click_wanted(void)                  /* CLICK REC: while a track is armed */
 {
-    return click_mode == CLICK_ON || (click_mode == CLICK_REC && song.rec && !chain.running);
+    return click_mode == CLICK_ON || (click_mode == CLICK_REC && song.rec);
 }
 /* the arp's note list (list, its length returned; 0: nothing to play): the held notes (sorted or as played) over OCT
  * octaves, *cnt of them. #191: the notes as they play now, a key's mapped again through kb_pitch (TRN, ROOT, SCALE,
@@ -716,7 +714,7 @@ static void keyboard_block(void)
     }
     lay = (fm1_in.buttons & kb_mask) || kb_lock;  /* (#83: kb_lock, a layer locked open with no button held) */
     fx = (fm1_in.buttons & perf_mask) || (kb_lock & 2u);
-    mute = song.grid == 2u ? ~0u : song.grid == 3u ? SONG_KEYS : 0u;   /* the keys that never sound here */
+    mute = song.grid >= 2u ? ~0u : 0u;            /* the keys that never sound here: NAME's, GLOBAL's (every key) */
     for (k = 0; k < 27u; k++) {
         if (!((ch >> k) & 1u))
             continue;
@@ -762,7 +760,6 @@ static void seq_start(void)
 {
     uint32_t i;
     motion_begin();
-    chain_start();
     for (i = 0; i < NTRK; i++) {                   /* every track from its step 0, together */
         track_t *t = &trk[i];
         t->seq_idx = (uint16_t)(t->p[P_SLEN] - 1);
@@ -811,7 +808,6 @@ static void seq_stop(void)
         trk[i].nd_late = trk[i].nd_early = ND_NONE;   /* (a nudged step not played yet: not after the stop) */
         trk[i].nd_fired = 0;
     }
-    chain_stop();
     motion_end();
 }
 
@@ -985,12 +981,6 @@ static __attribute__((noinline)) uint32_t seq_time(track_t *t, uint32_t idx, uin
     return mod_time(t, s->note[0], vel, period);
 }
 
-/* the automation a track plays: its slot's while a song plays (song_chain.c lanes; 0: a silent lane, none) */
-static const motion_store_t *chain_motion(const track_t *t)
-{
-    uint32_t s = chain.lane[trk_index(t)];
-    return !chain.running ? &motion : s < 4u ? &chain.source[s].motion : 0;
-}
 
 /* step idx plays: its chance (the one roll, as seq_step made it: a step that does not play applies no lock), the
  * automation and the locks before the notes (so a note-on reads them), the notes live recording
@@ -998,7 +988,7 @@ static const motion_store_t *chain_motion(const track_t *t)
 static __attribute__((noinline)) void seq_play(track_t *t, uint32_t idx, uint32_t period)
 {
     const step_t *s = &seq_steps(t)[idx];
-    const motion_store_t *m = chain_motion(t);
+    const motion_store_t *m = &motion;
     uint32_t skip = SEQ_ROLLED, i, k;
     if (seq_miss(t, s, idx))
         skip = SEQ_MISS;
@@ -1065,7 +1055,7 @@ static __attribute__((noinline)) void seq_nd_start(track_t *t, uint32_t period, 
             seq_play(t, t->seq_idx, period);
     }
     t->nd_fired = 0;
-    if ((!chain.running || nx) && (d = seq_nudge(t, &seq_steps(t)[nx])) < 0) {
+    if ((d = seq_nudge(t, &seq_steps(t)[nx])) < 0) {
         uint32_t at = step_samples(t, period, t->seq_idx), back = (uint32_t)-d * period / NUDGE_DIV;
         at = (at > back ? at - back : 0u) + 1u;
         t->nd_early = at < t->nd_late ? t->nd_late : at;   /* (never before this step's own late play) */
@@ -1102,8 +1092,8 @@ static void seq_tick(track_t *t, uint32_t n)
             seq_nd_due(t, period, len, cur_len, n);
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
             break;
-        top = t->seq_pos >= 0x7FFFFFFFu;            /* (PLAY, a SONG section: its first step) */
-        t->seq_pos = top ? (chain.running ? chain.carry : 0u) : t->seq_pos - cur_len;
+        top = t->seq_pos >= 0x7FFFFFFFu;            /* (PLAY: its first step) */
+        t->seq_pos = top ? 0u : t->seq_pos - cur_len;
         t->seq_idx = (uint16_t)((t->seq_idx + 1u) % len);
         seq_enter(t, top, len);
         if (t->p[P_SQNT] && !t->nd_fired)
@@ -1237,7 +1227,7 @@ static void events_block(uint32_t n)
             midi_clock_transport(0xFAu, fm1_ms);
         else if (cin_left)
             ;                                       /* counting in already (the UI's PLAY stops it: seq_counting) */
-        else if (cin_bars && song.rec && !song.playing && !chain.armed)
+        else if (cin_bars && song.rec && !song.playing)
             cin_begin();                            /* recording from stop: the count-in first */
         else
             seq_start();
@@ -1325,7 +1315,6 @@ static void events_block(uint32_t n)
     }
     if (aud_req)
         seq_audition();                               /* (STEP PREVIEW: a step sounds, stopped) */
-    chain_tick(seq_n);
     for (i = 0; i < NTRK; i++)
         seq_tick(&trk[i], seq_n);
     if (cin_flush)

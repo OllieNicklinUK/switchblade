@@ -8,7 +8,6 @@ static int project_save(uint32_t slot);
 static void panel_setup(void);
 static void project_load(uint32_t slot);
 static int project_used(uint32_t slot);
-static uint32_t chain_prepare(void);
 static int up_used(uint32_t k);              /* user presets: upreset.c */
 static int up_load(uint32_t k);
 static uint32_t up_count(void);
@@ -28,7 +27,6 @@ static void up_ui_named(uint32_t op, uint32_t k, const char *name, uint32_t cat)
 static uint32_t up_cat(uint32_t k);
 static int project_save_as(uint32_t slot, const char *name);
 static int project_name(uint32_t slot, char *b);
-static int project_info(uint32_t slot, char *b, uint16_t *len48, uint32_t *den, uint8_t *n);
 static int project_rename(uint32_t slot, const char *name);
 static int project_erase(uint32_t slot);
 static void project_cur_name(char *b);
@@ -170,8 +168,6 @@ static struct {
     uint8_t confirm_trk;         /* the track it clears, the slot it overwrites */
     uint8_t uslot;               /* SAVE > USER: the selected user preset slot */
     uint8_t ppick;               /* SAVE > PHRASES: the pattern picked (pat_count list index) */
-    uint8_t song_row;            /* SONG: the section selected, count selects + ADD */
-    uint8_t song_trk;            /* SONG: the lane (track) selected, 0..NTRK-1 */
     uint16_t ev_row;             /* SEQ > AUTOMATION (ui_events.c ev_*): the row selected (0 PLAY / CLEAR, 1 QUANTIZE, the
                                   * last + ADD; 1.2: up to EV_ROWS, past 255) */
     uint8_t ev_step, ev_id;      /* .. + ADD: the step and the parameter (or EV_CHANCE, EV_RATCH, EV_NUDGE, EV_VEL) it
@@ -211,7 +207,7 @@ static struct {
 } ui;
 
 enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER, CF_LOAD_PAT,
-       CF_DEL_ROW, CF_CLEAR_SONG, CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER, CF_ERASE_PROJ, CF_CLEAN_SOUND };
+       CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER, CF_ERASE_PROJ, CF_CLEAN_SOUND };
                                   /* ui.confirm: TOOLS' clears; SAVE over a used slot; a pattern over the user's steps;
                                    * USER ERASE; PROJECT ERASE (1.5.5, #199); CLEAN INIT (1.5.5, #190) */
 
@@ -375,7 +371,7 @@ static uint32_t large_kind(void)
     if (ui.home)                                        /* (HOME: its own layout in every setting, ui_big.c) */
         return LK_TALL;
     g = cur_page()->graph;
-    return g == GR_BROWSE || g == GR_SLOTS || g == GR_USER || g == GR_PATS || g == GR_SONG || g == GR_ROLL ||
+    return g == GR_BROWSE || g == GR_SLOTS || g == GR_USER || g == GR_PATS || g == GR_ROLL ||
            g == GR_EVENTS ? LK_LABEL : LK_TALL;
 }
 /* VOID FOUR's EDIT page (params.c GR_BIG, ui_big.c) shown: its own layout (header, two strips of two big cards, a
@@ -459,7 +455,9 @@ static void ui_message(const char *s) { ui_say(s, ""); }
 /* a message led by an icon: its first byte (ui_draw.c draw_head draws the icon, then the words) */
 #define MSG_NOFILE "\x01"                      /* the no-file icon (ICON_X_NOFILE) */
 
-static int chain_busy(void) { return chain.running || chain.armed; }
+/* SONG (the song chain) left the firmware on 2026-11-20 (GLOBAL's scenes replace it): a song never plays, so its old
+ * guards ("STOP TO EDIT" while one played) are always open. Kept as 0 until they go */
+static int chain_busy(void) { return 0; }
 /* Main loop only, with interrupts enabled. PLAY may be consumed between reads;
  * take one coherent snapshot before a flash operation or song preparation. */
 static int transport_busy(void)
@@ -470,20 +468,6 @@ static int transport_busy(void)
     fm1_irq_on();
     return busy;
 }
-static void chain_play_ui(void)
-{
-    uint32_t rc = chain_prepare();
-    if (!rc) {
-        ui.force = 1;
-    } else if (rc >= 3u) {
-        char b[8] = "A EMPTY";
-        b[0] = (char)('A' + rc - 3u);
-        ui_say("PATTERN ", b);
-    } else {
-        ui_message(rc == 1u ? "ADD A SECTION" : "STOP FIRST");
-    }
-}
-
 
 /* parameter locks: a page whose KNOB 1..4 can lock (a track's sound: one of its parameters can be motion; not MOD's
  * slots), the parameter KNOB k locks (ui.plk_src's page, HOME's four), 0xFF = none */
@@ -580,9 +564,9 @@ static int detail_on(void)
 {
     return !ui.home && !ui.menu && !ui.confirm && cur_page()->scope == SC_STEP && str_eq(cur_page()->title, "DETAIL");
 }
-/* GLO > SONG (1.2): the white keys A B C D (A3 B3 C4 D4, white places 2..5: seq.c song_key) set the selected cell's slot;
- * they do not sound there, the other keys play as anywhere (seq.c keyboard_block: song.grid 3) */
-static int song_keys_on(void) { return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_SONG; }
+/* GLOBAL (2026-11-20, the scenes plan): the keyboard plays no notes there, every key is the screen's (seq.c keyboard_block:
+ * song.grid 3); the sequencer, the arp and MIDI play on. Not in a layer (FX held: its effects, as on every page) */
+static int global_keys_on(void) { return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_SCENE; }
 
 /* SEQ cursor: wraps inside the pattern length, the bank follows, a step entry ends */
 static void cursor_set(int32_t c)
@@ -1545,8 +1529,6 @@ static uint32_t act_cols(void)                   /* the columns that are actions
         return 0;
     if (pg->graph == GR_EVENTS) return 16u;     /* AUTOMATION: no knob is an action; OCT+ by the row (ev_oct) */
     if (pg->graph == GR_TOOLS) return 15u;
-    if (pg->graph == GR_SONG)
-        return 1u;                               /* PLAY / STOP (also the PLAY button) */
     if (pg->graph == GR_PATS)
         return 2u;                               /* LOAD */
     if (pg->graph == GR_USER)
@@ -1563,7 +1545,6 @@ static uint32_t act_cols(void)                   /* the columns that are actions
 /* the action OCT+ does: its column + 1, 0 = none picked yet (PHRASES has LOAD only) */
 static uint32_t act_col(void)
 {
-    if (!ui.home && cur_page()->graph == GR_SONG) return 1u;
     if (!ui.home && cur_page()->graph == GR_EVENTS) return 5u;
     return !ui.home && cur_page()->graph == GR_PATS ? 2u : ui.act;
 }
@@ -1577,8 +1558,6 @@ static const char *act_name(uint32_t c)          /* column c's action (the foote
         static const char *const actions[] = {"CLEAR", "INIT", "DELETE", "CLEAR"};
         return (c & 3u) == 1u && ui.tl_clean ? "CLEAN" : actions[c & 3u];   /* (1.5.5: KNOB 2 on: CLEAN INIT) */
     }
-    if (cur_page()->graph == GR_SONG)
-        return song.playing || chain_busy() ? "STOP" : "PLAY";
     if (cur_page()->graph == GR_PATS)
         return "LOAD";
     if (cur_page()->graph == GR_USER)
@@ -1596,11 +1575,8 @@ static int act_ready(void)
     if (!c--)
         return 0;
     if (cur_page()->graph == GR_EVENTS) return ev_act_ready();
-    if (cur_page()->graph == GR_TOOLS)                  /* one case per column: CLEAR PAT, INIT, DELETE ROW, CLEAR SONG */
-        return !chain_busy() && (c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u ? 1 :
-                                 c == 2u ? ui.song_row < chain_config.count : chain_config.count != 0u);
-    if (cur_page()->graph == GR_SONG)
-        return song.playing || chain_busy() || chain_config.count;
+    if (cur_page()->graph == GR_TOOLS)                  /* one case per column: CLEAR PAT, INIT (2, 3: SONG's, retired) */
+        return c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u;
     if (cur_page()->graph == GR_PATS)
         return pat_last[s] != pat_pick() + 1u || steps_sig(TSEL) != pat_sig[s];
     if (cur_page()->graph == GR_USER)

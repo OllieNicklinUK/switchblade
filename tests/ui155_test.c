@@ -191,9 +191,9 @@ static int select_page(void)
         turn(EN_SELECT, 1);
         ok &= !ui.home && cur_page()->fam == FAM_EDIT && page_visible(ui.page);
     }
-    go_title("SONG"); frame();
+    go_title("GLOBAL"); frame();
     turn(EN_SELECT, 1);
-    ok &= title_is("SONG");                             /* (GLO: one page) */
+    ok &= title_is("GLOBAL");                           /* (GLO: one page) */
     bad += check("  PAGE: EDIT's round is the engine's pages; a family of one page stays", ok);
 
     go_title("ENV"); frame();

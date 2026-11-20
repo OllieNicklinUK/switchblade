@@ -68,6 +68,30 @@ static uint32_t proj_hash(const void *p, uint32_t n)   /* FNV-1a over n bytes */
     return s;
 }
 static uint32_t proj_sum(const project_t *p) { return proj_hash(p, sizeof *p - 4u); }
+/* FOR4's 84 song-chain bytes (core.h chain_config_t): SONG left GLOBAL on 2026-11-20 (the scenes replace it), so nothing
+ * reads them; a save writes the defaults (no sections), a load still checks them as before, so a project an older
+ * firmware wrote loads exactly as it did */
+static void chain_defaults(chain_config_t *c)
+{
+    uint32_t i;
+    memset(c, 0, sizeof *c);
+    for (i = 0; i < CHAIN_ROWS; i++)
+        c->row[i].repeat = 1;
+}
+static int chain_valid(const chain_config_t *c)
+{
+    uint32_t i, k;
+    if (c->count > CHAIN_ROWS)
+        return 0;
+    for (i = 0; i < c->count; i++) {
+        for (k = 0; k < NTRK; k++)
+            if (c->row[i].slot[k] > CHAIN_SILENT)
+                return 0;
+        if (!c->row[i].repeat || c->row[i].repeat > 16u)
+            return 0;
+    }
+    return 1;
+}
 static int proj_ok(const project_t *q) { return q->magic == PROJ_MAGIC && q->size == sizeof *q &&
     q->sum == proj_sum(q) && chain_valid(&q->chain) && motion_valid(&q->motion); }
 
@@ -301,7 +325,7 @@ static void project_capture(project_t *p)
     p->sel = song.sel;
     p->parts = NPART;
     p->phys = PROJ_PHYS;
-    p->chain = chain_config;
+    chain_defaults(&p->chain);
     for (i = 0; i < NTRK; i++) {
         for (uint32_t j = 0; j < P_COUNT; j++) p->t[i].p[j] = motion_base_value(&trk[i], j);
         p->t[i].engine = trk[i].eng_req;
@@ -357,54 +381,14 @@ static int project_save(uint32_t slot) { return project_save_as(slot, 0); }
 static void project_cur_name(char *b) { str_cpy(b, proj_name, PROJ_NAME_LEN + 1u); }   /* b: 13 bytes */
 
 /* slot's name -> b (PROJ_NAME_LEN + 1 bytes); 0 = an empty slot (b ""). Uses proj_scratch */
-static int project_name(uint32_t slot, char *b) { return project_info(slot, b, 0, 0, 0); }
-/* .. and, len48 not 0, the length of each track's pattern as SONG plays it (song_chain.c chain_tick: the clock track's
- * LEN steps of its DIV, clamped as chain_prepare does) in 1/48 quarter notes (a 4/4 bar: 192; 0 = an empty slot):
- * len48[0..NTRK-1] */
-static uint32_t len48_of(int32_t len, int32_t div)
+static int project_info(uint32_t slot, char *b);
+static int project_name(uint32_t slot, char *b) { return project_info(slot, b); }
+static int project_info(uint32_t slot, char *b)
 {
-    uint32_t n = (uint32_t)clamp(len, TP[P_SLEN].min, TP[P_SLEN].max), d = (uint32_t)clamp(div, TP[P_SDIV].min, TP[P_SDIV].max);
-    return n * (d < 6u ? 48u / DIV_DEN[d] : d < 10u ? 48u << (d - 5u) : 48u / DIV_DEN[d % 6u]);   /* (fx.c div_samples) */
-}
-/* SONG's picture of a pattern (ui_graph.c graph_song): its LEN steps in n = min(LEN, 16) cells (a cell: steps
- * c * LEN / n .. (c + 1) * LEN / n - 1), 2 bits a cell, cell c at bits 2c: a step weighs 0 (rest, empty, CHANCE 0),
- * 1 (a tie), 2 (a note), 3 (accented); a cell's level is its steps' mean, rounded up (0..3) */
-static uint32_t proj_density(const proj_trk_t *t, uint8_t *n)
-{
-    uint32_t len = (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP), nc = len < 16u ? len : 16u, c, i, d = 0;
-    for (c = 0; c < nc; c++) {
-        uint32_t i0 = c * len / nc, i1 = (c + 1u) * len / nc, w = 0;
-        for (i = i0; i < i1; i++) {
-            const step_t *s = &t->step[i];
-            if (s->time == ST_TIE)
-                w += 1u;
-            else if (s->time == ST_NOTE && s->n && step_chance(s))
-                w += (s->flags & SF_ACCENT) ? 3u : 2u;
-        }
-        w = (w + (i1 - i0) - 1u) / (i1 - i0);
-        d |= (w < 3u ? w : 3u) << (2u * c);
-    }
-    *n = (uint8_t)nc;
-    return d;
-}
-/* .. and, den not 0, each track's picture (proj_density: den[k], its cells n[k]; 0 for an empty slot) */
-static int project_info(uint32_t slot, char *b, uint16_t *len48, uint32_t *den, uint8_t *n)
-{
-    uint32_t k;
     b[0] = 0;
-    if (len48)
-        memset(len48, 0, NTRK * sizeof *len48);
-    if (den) {
-        memset(den, 0, NTRK * sizeof *den);
-        memset(n, 0, NTRK);
-    }
     if (!proj_import(&proj_scratch, &proj_slot[slot & 3u], sizeof(project_store_t)))
         return 0;
     proj_name_get(b, (const uint8_t *)proj_scratch.name);
-    for (k = 0; len48 && k < NTRK; k++)
-        len48[k] = (uint16_t)len48_of(proj_scratch.t[k].p[P_SLEN], proj_scratch.t[k].p[P_SDIV]);
-    for (k = 0; den && k < NTRK; k++)
-        den[k] = proj_density(&proj_scratch.t[k], &n[k]);
     return 1;
 }
 
@@ -495,11 +479,9 @@ static int project_restore_runtime(const project_t *input)
     fm1_irq_off();                                      /* the audio ISR must not see half a project */
     seq_stop();
     transport_req = 0;
-    chain_config = p->chain;
     motion = p->motion;
     memset(motion_active, 0, sizeof motion_active);
     motion_base_valid = 0;
-    ui.song_row = 0;
     for (i = 0; i < G_COUNT; i++)
         if (i != G_SLOT && i != G_LOAD && i != G_SAVE)
             song.g[i] = (int16_t)clamp(p->g[i], GP[i].min, GP[i].max);
@@ -597,55 +579,6 @@ static void persist_boot(void)                    /* before settings_init / pane
 
 static int project_used(uint32_t slot) { return proj_import(&proj_scratch, &proj_slot[slot & 3u], sizeof(project_store_t)); }
 
-/* Main loop only: no flash access or copies when the ISR changes rows. */
-static uint32_t chain_prepare(void)
-{
-    uint32_t i, k, j, used = 0;
-    if (transport_busy())
-        return 2;
-    if (!chain_valid(&chain_config) || !chain_config.count)
-        return 1;
-    for (i = 0; i < chain_config.count; i++)            /* the slots the lanes play (not the silent ones) */
-        for (k = 0; k < NTRK; k++) {
-            uint32_t s = chain_config.row[i].slot[k];
-            if (s >= 4u || ((used >> s) & 1u))
-                continue;
-            if (!project_used(s))
-                return 3u + s;
-            used |= 1u << s;
-        }
-    chain.config = chain_config;
-    for (i = 0; i < 4u; i++)
-        if ((used >> i) & 1u) {
-            project_t *p = &proj_scratch;
-            if (!proj_import(p, &proj_slot[i], sizeof(project_store_t))) return 3u + i;
-            chain.source[i].motion = p->motion;
-            /* A song keeps its current instruments. Engine-specific motion from
-             * another instrument would change a kit/wave/algorithm unexpectedly. */
-            {
-                motion_store_t *m = &chain.source[i].motion; uint32_t n = 0;
-                for (uint32_t e = 0; e < m->count; e++) {
-                    const motion_event_t *v = &m->event[e]; uint32_t owner = v->place >> 6;
-                    if (MOTION_ID(v) >= P_FM1_ATK && p->t[owner].engine != trk[owner].eng_req) continue;
-                    m->event[n++] = *v;
-                }
-                m->count = (uint8_t)n;
-            }
-            for (k = 0; k < NTRK; k++) {
-                memcpy(chain.source[i].step[k], p->t[k].step, sizeof p->t[k].step);
-                proj_steps(chain.source[i].step[k]);
-                chain.source[i].qnt[k] = p->t[k].p[P_SQNT] != 0;
-                for (j = 0; j < 4u; j++)
-                    chain.source[i].timing[k][j] = (int16_t)clamp(p->t[k].p[P_SLEN + j],
-                        TP[P_SLEN + j].min, TP[P_SLEN + j].max);
-            }
-        }
-    RING_PUBLISH();
-    chain.armed = 1;
-    transport_req = 1;
-    return 0;
-}
-
 static void settings_poll(void)
 {
 #if FELUCCA_FLASH
@@ -732,7 +665,6 @@ static uint32_t autosave_sig(void)
             h = as_mix(h, &song.g[i], sizeof song.g[i]);
     h = as_mix(h, song.mch, sizeof song.mch);           /* (1.5.5: MIDI IN TRACK's channels, the project's) */
     h = as_mix(h, &motion, sizeof motion);
-    h = as_mix(h, &chain_config, sizeof chain_config);
     return as_mix(h, proj_name, sizeof proj_name);
 }
 

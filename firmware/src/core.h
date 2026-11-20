@@ -381,8 +381,8 @@ _Static_assert(sizeof(track_t) % 16u == 0, "track_t: a multiple of 16 bytes (a c
 typedef struct {
     int16_t g[G_COUNT];
     uint8_t playing, seq_mode;
-    uint8_t grid;                /* the keys' mode: 0 they play; 2: NAME (ui_name.c): no key plays; 3: SONG, A..D are
-                                  * its (seq.c song_key). (1 was the retired DRUM grid) */
+    uint8_t grid;                /* the keys' mode: 0 they play; 2: NAME (ui_name.c): no key plays; 3: GLOBAL (2026-11-20):
+                                  * no key plays, they are the screen's. (1 was the retired DRUM grid; 3 SONG's A..D) */
     uint8_t rec;                 /* live recording armed: bit per track */
     uint8_t sel;                 /* selected track 0..NTRK-1: keys, pages, editor */
     int8_t octave;

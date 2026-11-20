@@ -438,7 +438,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_SET:
         if (na < 2u || !(d = ed_desc(a[0], a[1], &vp)))
             return;
-        if (cmd == ED_SET && na >= 4u && !(chain_busy() && !a[0] && chain_owns(a[1]))) {
+        if (cmd == ED_SET && na >= 4u) {
             if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path */
                 ed_load_t b;
                 ed_load_before(&b);
@@ -724,7 +724,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             return;
         t = &trk[a[0]];
         d = ed_tdesc(t, a[1]);
-        if (na >= 4u && !(chain_busy() && chain_owns(a[1]))) {
+        if (na >= 4u) {
             if (d->max > d->min)                           /* as SET: clamped; a fixed value stays */
                 t->p[a[1]] = (int16_t)clamp(ed_rv(a + 2), d->min, d->max);
             (void)motion_capture(t, a[1], t->p[a[1]]);
@@ -736,45 +736,15 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_v(t->p[a[1]]);
         break;
     }
-    case ED_SONG: {                                     /* ops 0..3 rows of one slot (v6); 4..7 the same with a slot
-                                                         * per track (1.2, `57 01`) */
-        uint32_t rc = 0, op, lanes, w, k;
-        chain_config_t c;
+    case ED_SONG: {                                     /* v6 / 1.2: the song chain. Retired 2026-11-20 (SONG left GLOBAL: the
+                                                         * scenes replace it): the reply keeps its shape, a song is never
+                                                         * set or played (rc 1), op 3 still stops; 0 sections, not running */
+        uint32_t op;
         if (!na || a[0] > 7u) return;
         op = a[0] & 3u;
-        lanes = a[0] >> 2;
-        w = lanes ? NTRK + 1u : 2u;                     /* the bytes of a row */
-        if (op == 1u) {
-            chain_defaults(&c);
-            if (na < 2u || a[1] > CHAIN_ROWS || na != 2u + w * a[1]) rc = 1;
-            else {
-                c.count = a[1];
-                for (i = 0; i < c.count; i++) {
-                    const uint8_t *r = a + 2u + w * i;
-                    if (lanes) {
-                        memcpy(c.row[i].slot, r, NTRK);
-                        c.row[i].repeat = r[NTRK];
-                    } else if (r[0] < 4u)       /* (a row of one slot: all four tracks on it) */
-                        c.row[i] = chain_row_of(r[0], r[1]);
-                    else
-                        c.row[i].repeat = 0;    /* (invalid) */
-                }
-                if (!chain_valid(&c)) rc = 1;
-                else if (chain_busy()) rc = 2;
-                else { chain_config = c; ui.song_row = 0; ui.force = 1; }
-            }
-        } else if (op == 2u) rc = chain_prepare();
-        else if (op == 3u) transport_req = 2;
-        ed_b(a[0]); ed_b(rc); ed_b(chain_config.count);
-        ed_b(chain.running); ed_b(chain.row); ed_b(chain.remaining);
-        for (i = 0; i < chain_config.count; i++) {
-            const chain_row_t *r = &chain_config.row[i];
-            if (lanes)
-                for (k = 0; k < NTRK; k++) ed_b(r->slot[k]);
-            else                                         /* v6: the clock track's slot (every track "-": A) */
-                ed_b(r->slot[chain_clock(r)] < 4u ? r->slot[chain_clock(r)] : 0u);
-            ed_b(r->repeat);
-        }
+        if (op == 3u) transport_req = 2;
+        ed_b(a[0]); ed_b(op == 1u || op == 2u ? 1u : 0u); ed_b(0);
+        ed_b(0); ed_b(0); ed_b(0);
         break;
     }
     default:
